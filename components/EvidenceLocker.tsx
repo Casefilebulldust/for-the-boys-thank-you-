@@ -174,7 +174,7 @@ export default function EvidenceLocker() {
                 !geminiApiKey && React.createElement('div', {className: 'p-3 text-xs bg-warning-primary/10 text-warning-primary rounded-md border border-warning-primary/20'}, 'Warning: No API key found. AI entity extraction will be disabled.'),
                 React.createElement('div', null,
                     React.createElement('label', { htmlFor: 'fileNameModal', className: 'block text-sm font-medium mb-1' }, 'File Name / Identifier'),
-                    React.createElement('input', { id: 'fileNameModal', type: 'text', value: fileName, onChange: handleFileNameChange, className: 'form-input', placeholder: 'e.g., Medical_Report_2025-08-15.pdf', required: true })
+                    React.createElement('input', { id: 'fileNameModal', type: 'text', value: String(fileName), onChange: handleFileNameChange, className: 'form-input', placeholder: 'e.g., Medical_Report_2025-08-15.pdf', required: true })
                 ),
                 React.createElement('div', null,
                     React.createElement('label', { htmlFor: 'descriptionModal', className: 'block text-sm font-medium mb-1' }, 'Description'),

@@ -238,6 +238,18 @@ export interface PersonalVaultEntry {
     title: string;
 }
 
+// === Master Timeline ===
+export interface TimelineEvent {
+    id: string; // e.g., 'evidence-123'
+    date: string; // ISO String
+    type: 'Evidence' | 'Charge' | 'Wellness' | 'Action';
+    title: string;
+    description: string;
+    icon: string;
+    colorClass: string;
+    targetTab: string;
+}
+
 
 export interface SpudHubData {
     geminiApiKey: string;

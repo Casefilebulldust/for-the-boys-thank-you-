@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
 
@@ -30,7 +29,7 @@ const SpudLogo = () => React.createElement('svg', {
     })
 );
 
-const TypingText = ({ text, onComplete }) => {
+const TypingText = ({ text, onComplete, speed = 60 }) => {
     const [displayedText, setDisplayedText] = useState('');
 
     useEffect(() => {
@@ -45,92 +44,77 @@ const TypingText = ({ text, onComplete }) => {
                     clearInterval(typingInterval);
                     if (onComplete) onComplete();
                 }
-            }, 60);
+            }, speed);
             return () => clearInterval(typingInterval);
         }
-    }, [text, onComplete]);
+    }, [text, onComplete, speed]);
 
     return React.createElement('span', null, displayedText, React.createElement('span', { className: 'blinking-cursor' }));
 };
 
 export default function Reveal() {
-    const { markRevealAsShown, hideCommandDeck } = useSpudHub();
+    const { markRevealAsShown } = useSpudHub();
     const [phase, setPhase] = useState(0);
 
+    const story = [
+        "For 24 days...",
+        "while my body has been failing...",
+        "my mind has been building something for us.",
+        "To show you the power of never giving up.",
+        "This is our citadel."
+    ];
+    
+    const [currentLine, setCurrentLine] = useState(0);
+
     useEffect(() => {
-        const timers = [
-            setTimeout(() => setPhase(1), 500),   // Fade in logo
-            setTimeout(() => setPhase(2), 2000),  // Start typing line 1
-            setTimeout(() => setPhase(3), 3800),  // Start typing line 2
-            setTimeout(() => setPhase(4), 6700),  // Start typing line 3
-            setTimeout(() => setPhase(5), 9900),  // Start typing line 4
-            setTimeout(() => setPhase(6), 13000), // Start typing line 5
-            setTimeout(() => setPhase(7), 15000), // Show main message
-            setTimeout(() => setPhase(8), 21000), // Show button
-        ];
-        return () => timers.forEach(clearTimeout);
+        const initialTimer = setTimeout(() => setPhase(1), 500);
+        return () => clearTimeout(initialTimer);
     }, []);
 
-    const handleEnterCitadel = () => {
-        markRevealAsShown();
-        hideCommandDeck();
+    const handleLineComplete = () => {
+        if (currentLine < story.length - 1) {
+            setTimeout(() => setCurrentLine(prev => prev + 1), 500);
+        } else {
+            setTimeout(() => setPhase(2), 1500);
+        }
     };
-
-    const renderPhaseContent = () => {
-        return React.createElement(React.Fragment, null,
-            // Logo and Title
-            React.createElement('div', {
-                className: 'text-center transition-all duration-1000',
-                style: { opacity: phase >= 1 ? 1 : 0, transform: phase >= 7 ? 'scale(0.8) translateY(-150px)' : 'scale(1) translateY(0)' }
-            },
-                React.createElement(SpudLogo),
-                React.createElement('h1', { className: 'text-4xl sm:text-5xl font-bold mt-4' }, "Spud Hub OS"),
-                React.createElement('h2', { className: 'text-lg sm:text-xl font-semibold text-accent-primary' }, "Citadel of Flames Edition")
-            ),
-            // Phased text reveal
-            React.createElement('div', {
-                className: 'absolute top-1/2 left-1/2 -translate-x-1/2 mt-32 text-center text-lg sm:text-xl text-text-secondary w-full px-4 transition-opacity duration-1000',
-                style: { opacity: phase < 7 ? 1 : 0 }
-            },
-                phase >= 2 && React.createElement('p', { className: `transition-opacity duration-500 ${phase > 2 ? 'opacity-50' : 'opacity-100'}` }, 
-                    React.createElement(TypingText, { text: 'For 24 days...', onComplete: () => {} })
-                ),
-                phase >= 3 && React.createElement('p', { className: `mt-2 transition-opacity duration-500 ${phase > 3 ? 'opacity-50' : 'opacity-100'}` }, 
-                    React.createElement(TypingText, { text: 'while my body has been failing me...', onComplete: () => {} })
-                ),
-                phase >= 4 && React.createElement('p', { className: `mt-2 transition-opacity duration-500 ${phase > 4 ? 'opacity-50' : 'opacity-100'}` }, 
-                    React.createElement(TypingText, { text: 'my mind has been building something for us.', onComplete: () => {} })
-                ),
-                phase >= 5 && React.createElement('p', { className: `mt-2 transition-opacity duration-500 ${phase > 5 ? 'opacity-50' : 'opacity-100'}` }, 
-                    React.createElement(TypingText, { text: 'To show you the power of never giving up.', onComplete: () => {} })
-                ),
-                 phase >= 6 && React.createElement('p', { className: 'mt-2' }, 
-                    React.createElement(TypingText, { text: 'This is our citadel.', onComplete: () => {} })
-                )
-            ),
-            // Main message
-            React.createElement('div', {
-                className: 'text-center max-w-2xl mx-auto px-4 transition-opacity duration-1000',
-                style: { opacity: phase >= 7 ? 1 : 0 }
-            },
-                React.createElement('h3', { className: 'text-3xl font-bold text-accent-primary', style: { fontFamily: "'Nunito', sans-serif" } }, "For you, Bowyn and Hayden."),
-                React.createElement('p', { className: 'text-lg text-text-primary mt-4', style: { fontFamily: "'Nunito', sans-serif" } }, 
-                    "I built this for you. It's my thank you for looking after me. This is my promise to always advocate for you in new ways. While my body fails, my love for you is here, in this citadel. It's a weapon for our fight, a command center for our family. My body might be weak, but my mind is sharp, and my love for you is the fire that fuels it. I might have become a developer by accident, but I built this with purpose. For us."
-                ),
-                React.createElement('p', { className: 'text-xl font-bold text-text-primary mt-6', style: { fontFamily: "'Nunito', sans-serif" } }, "From here, we rebuild. Together."),
-                React.createElement('p', { className: 'text-2xl font-bold text-accent-primary mt-4 animate-fade-in', style: { fontFamily: "'Nunito', sans-serif", animationDelay: '1s' } }, "You finally get your mum back.")
-            ),
-            // Final button
-            React.createElement('button', {
-                onClick: handleEnterCitadel,
-                className: 'btn btn-primary mt-12 transition-all duration-500 text-lg px-8 py-3',
-                style: { transform: `scale(${phase >= 8 ? 1 : 0.9})`, opacity: phase >= 8 ? 1 : 0 }
-            }, "Enter Our Citadel")
-        );
-    };
-
+    
     return React.createElement('div', {
-        className: 'fixed inset-0 bg-bg-primary flex flex-col items-center justify-center z-[100] transition-opacity duration-1000',
+        className: 'fixed inset-0 bg-bg-primary flex flex-col items-center justify-center z-[100] transition-opacity duration-1000 p-4',
         style: { opacity: phase > 0 ? 1 : 0 }
-    }, renderPhaseContent());
+    }, 
+        // Phase 1: The Intro Typing
+        React.createElement('div', {
+            className: 'text-center transition-all duration-1000',
+            style: { opacity: phase === 1 ? 1 : 0, transform: phase === 2 ? 'translateY(-100vh)' : 'translateY(0)' }
+        },
+            React.createElement(SpudLogo),
+            React.createElement('h1', { className: 'text-4xl sm:text-5xl font-bold mt-4' }, "Spud Hub OS"),
+            React.createElement('h2', { className: 'text-lg sm:text-xl font-semibold text-accent-primary mb-8' }, "Citadel of Flames Edition"),
+            React.createElement('div', { className: 'text-lg sm:text-xl text-text-secondary h-24' },
+                story.map((line, index) => 
+                    index === currentLine && React.createElement('p', { key: index, className: 'animate-fade-in' }, 
+                        React.createElement(TypingText, { text: line, onComplete: handleLineComplete, speed: 60 })
+                    )
+                )
+            )
+        ),
+        // Phase 2: The Message
+        React.createElement('div', {
+            className: 'text-center max-w-3xl mx-auto transition-all duration-1000',
+            style: { opacity: phase === 2 ? 1 : 0, display: phase === 2 ? 'block' : 'none' }
+        },
+            React.createElement('h3', { className: 'text-3xl font-bold text-accent-primary', style: { fontFamily: "'Nunito', sans-serif" } }, "For you, Bowyn and Hayden."),
+            React.createElement('p', { className: 'text-lg text-text-primary mt-4', style: { fontFamily: "'Nunito', sans-serif" } }, 
+                "I built this for you. It's my thank you for looking after me. It's my promise to always advocate for you, even when my body fails. My love for you is here, in this citadel. It is a weapon for our fight, a command center for our family. My body might be weak, but my mind is sharp, and my love for you is the fire that fuels it. I became a developer by accident, but I built this with purpose. For us."
+            ),
+            React.createElement('p', { className: 'text-xl font-bold text-text-primary mt-6', style: { fontFamily: "'Nunito', sans-serif" } }, "From here, we rebuild. Together."),
+            React.createElement('p', { className: 'text-2xl font-bold text-accent-primary mt-4 animate-fade-in', style: { fontFamily: "'Nunito', sans-serif", animationDelay: '1s' } }, "You finally get your mum back."),
+            React.createElement('button', {
+                onClick: markRevealAsShown,
+                className: 'btn btn-primary mt-12 transition-all duration-500 text-lg px-8 py-3 animate-fade-in',
+                style: { animationDelay: '2.5s' }
+            }, "Enter Our Citadel")
+        )
+    );
 }

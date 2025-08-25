@@ -72,7 +72,7 @@ export default function DossierGenerator() {
                 ),
                 template === 'Custom' && React.createElement('div', { className: 'animate-fade-in' },
                     React.createElement('label', { htmlFor: 'topic', className: 'block text-sm font-medium mb-1' }, 'Custom Topic'),
-                    React.createElement('input', { id: 'topic', type: 'text', value: topic, onChange: e => setTopic(e.target.value), className: 'form-input', placeholder: "e.g., Timeline of DVO breaches", required: true })
+                    React.createElement('input', { id: 'topic', type: 'text', value: String(topic), onChange: e => setTopic(e.target.value), className: 'form-input', placeholder: "e.g., Timeline of DVO breaches", required: true })
                 ),
                 React.createElement('button', {
                     onClick: handleGenerate,

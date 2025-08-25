@@ -49,6 +49,7 @@ export default function Sidebar() {
         { name: 'Mindset & Resilience', icon: 'fa-spa' },
         { name: 'Dossier Generator', icon: 'fa-book' }, 
         { name: 'Personal Vault', icon: 'fa-lock' },
+        { name: 'Operating System', icon: 'fa-terminal' },
         { name: 'System Settings', icon: 'fa-cog' },
     ];
     return React.createElement('nav', { className: 'w-64 bg-black/50 backdrop-blur-md p-4 flex flex-col no-print border-r border-border-primary' },

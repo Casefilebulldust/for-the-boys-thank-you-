@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
 import { useToast } from '../contexts/ToastContext.tsx';
@@ -143,14 +144,14 @@ const JournalEntryModal = ({ isOpen, onClose, addWellnessLog }) => {
                         React.createElement('span', null, 'Stress Level'),
                         React.createElement('span', { className: `font-bold ${getLevelColor(stress)}` }, stress)
                     ),
-                    React.createElement('input', { id: 'stress_modal', type: 'range', min: '0', max: '10', value: stress, onChange: e => setStress(Number(e.target.value)), className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' })
+                    React.createElement('input', { id: 'stress_modal', type: 'range', min: '0', max: '10', value: String(stress), onChange: e => setStress(Number(e.target.value)), className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' })
                 ),
                 React.createElement('div', null,
                     React.createElement('label', { htmlFor: 'pain_modal', className: 'block text-sm font-medium mb-1 flex justify-between' },
                         React.createElement('span', null, 'Pain Level'),
                         React.createElement('span', { className: `font-bold ${getLevelColor(pain)}` }, pain)
                     ),
-                    React.createElement('input', { id: 'pain_modal', type: 'range', min: '0', max: '10', value: pain, onChange: e => setPain(Number(e.target.value)), className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' })
+                    React.createElement('input', { id: 'pain_modal', type: 'range', min: '0', max: '10', value: String(pain), onChange: e => setPain(Number(e.target.value)), className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' })
                 ),
             ),
             React.createElement('div', { className: 'flex justify-end gap-2 pt-2' },
@@ -225,14 +226,14 @@ export default function WellnessTracker() {
                             React.createElement('span', null, 'Stress Level'),
                             React.createElement('span', { className: `font-bold ${getLevelColor(stress)}` }, stress)
                         ),
-                        React.createElement('input', { id: 'stress', name: 'stress', type: 'range', min: '0', max: '10', value: stress, onChange: handleStressChange, className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' })
+                        React.createElement('input', { id: 'stress', name: 'stress', type: 'range', min: '0', max: '10', value: String(stress), onChange: handleStressChange, className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' })
                     ),
                     React.createElement('div', null,
                         React.createElement('label', { htmlFor: 'pain', className: 'block text-sm font-medium mb-1 flex justify-between' },
                             React.createElement('span', null, 'Pain Level'),
                             React.createElement('span', { className: `font-bold ${getLevelColor(pain)}` }, pain)
                         ),
-                        React.createElement('input', { id: 'pain', name: 'pain', type: 'range', min: '0', max: '10', value: pain, onChange: handlePainChange, className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' })
+                        React.createElement('input', { id: 'pain', name: 'pain', type: 'range', min: '0', max: '10', value: String(pain), onChange: handlePainChange, className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' })
                     ),
                     React.createElement('div', null,
                         React.createElement('label', { htmlFor: 'notes', className: 'block text-sm font-medium mb-1' }, 'Notes (Optional)'),

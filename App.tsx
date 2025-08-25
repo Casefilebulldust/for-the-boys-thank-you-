@@ -26,6 +26,7 @@ import SystemSettings from './features/SystemSettings.tsx';
 import PersonalVault from './features/PersonalVault.tsx';
 import CommandDeck from './components/CommandDeck.tsx';
 import Reveal from './features/Reveal.tsx';
+import OperatingSystem from './features/OperatingSystem.tsx';
 
 // === ROOT APP COMPONENT ===
 export default function App() {
@@ -69,6 +70,7 @@ export default function App() {
             case 'Dossier Generator': return React.createElement(KnowledgeBase);
             case 'System Settings': return React.createElement(SystemSettings);
             case 'Personal Vault': return React.createElement(PersonalVault);
+            case 'Operating System': return React.createElement(OperatingSystem);
             default: return React.createElement(WarRoom);
         }
     };

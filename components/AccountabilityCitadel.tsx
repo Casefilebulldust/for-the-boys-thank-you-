@@ -169,11 +169,11 @@ export default function AccountabilityCitadel() {
                 React.createElement('h2', { className: 'text-lg font-semibold' }, 'Log New Charge'),
                 React.createElement('div', null,
                     React.createElement('label', { htmlFor: 'date', className: 'block text-sm font-medium mb-1' }, 'Date'),
-                    React.createElement('input', { type: 'date', id: 'date', value: date, onChange: (e) => setDate(e.target.value), className: 'form-input', required: true })
+                    React.createElement('input', { type: 'date', id: 'date', value: String(date), onChange: (e) => setDate(e.target.value), className: 'form-input', required: true })
                 ),
                 React.createElement('div', null,
                     React.createElement('label', { htmlFor: 'agency', className: 'block text-sm font-medium mb-1' }, 'Agency'),
-                    React.createElement('input', { type: 'text', id: 'agency', value: agency, onChange: (e) => setAgency(e.target.value), className: 'form-input', placeholder: 'e.g., QPS (Hendra)', required: true })
+                    React.createElement('input', { type: 'text', id: 'agency', value: String(agency), onChange: (e) => setAgency(e.target.value), className: 'form-input', placeholder: 'e.g., QPS (Hendra)', required: true })
                 ),
                 React.createElement('div', null,
                     React.createElement('label', { htmlFor: 'failure', className: 'block text-sm font-medium mb-1' }, 'Failure / Dereliction of Duty'),
