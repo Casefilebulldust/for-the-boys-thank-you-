@@ -1,0 +1,8 @@
+{
+  "name": "Thank you for looking after me",
+  "description": "A weapon for accountability. An AI-powered operating system forged in fire for managing complex legal cases, coordinating support, and executing a relentless advocacy campaign. This is the command center for your fight.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
