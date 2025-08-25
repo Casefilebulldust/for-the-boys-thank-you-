@@ -346,7 +346,7 @@ export function SpudHubProvider({ children }) {
         
         // Add Goal and Argument Nodes, and link arguments to goals
         allData.strategyData.forEach(goal => {
-            nodes.push({ id: `goal-${goal.id}`, label: `Goal: ${goal.text.substring(0, 30)}...`, type: 'Goal', originalId: goal.id }));
+            nodes.push({ id: `goal-${goal.id}`, label: `Goal: ${goal.text.substring(0, 30)}...`, type: 'Goal', originalId: goal.id });
             goal.arguments.forEach(a => {
                 nodes.push({ id: `argument-${a.id}`, label: a.text, type: 'Argument', originalId: a.id });
                 links.push({ source: `goal-${goal.id}`, target: `argument-${a.id}` });

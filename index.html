@@ -225,9 +225,10 @@
 
         /* Nexus Graph Styles */
         .nexus-node { cursor: pointer; transition: all 0.2s ease-in-out; }
-        .nexus-node:hover { transform: scale(1.1); filter: drop-shadow(0 0 5px currentColor); }
-        .nexus-link { stroke: var(--border-secondary); stroke-width: 1.5px; opacity: 0.6; transition: all 0.2s ease-in-out; }
-        .nexus-label { fill: var(--text-primary); font-size: 10px; pointer-events: none; text-anchor: middle; }
+        .nexus-node circle { transition: all 0.2s ease; }
+        .nexus-node:hover circle { transform: scale(1.2); }
+        .nexus-link { stroke: var(--border-secondary); stroke-width: 1.5px; transition: all 0.2s ease-in-out; }
+        .nexus-label { fill: var(--text-primary); font-size: 10px; pointer-events: none; text-anchor: middle; text-shadow: 0 0 3px var(--bg-primary), 0 0 3px var(--bg-primary); }
 
         /* Child Timeline Styles */
         .timeline-item::before {
