@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo } from 'react';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
 import PageTitle from './PageTitle.tsx';
@@ -65,7 +63,7 @@ const EvidenceCard = ({ item, linkedStrategyIds, linkedChargeIds }) => {
 
 
 export default function EvidenceLocker() {
-    const { evidenceData, addEvidence, geminiApiKey, strategyData, accountabilityEntries } = useSpudHub();
+    const { evidenceData, addEvidence, strategyData, accountabilityEntries, isAiAvailable } = useSpudHub();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [fileName, setFileName] = useState('');
     const [description, setDescription] = useState('');
@@ -149,7 +147,7 @@ export default function EvidenceLocker() {
                 value: sortOrder, 
                 onChange: e => setSortOrder(e.target.value), 
                 className: 'form-select w-full sm:w-auto' 
-            },
+            } as any,
                 React.createElement('option', { value: 'date-desc' }, 'Sort by Newest'),
                 React.createElement('option', { value: 'date-asc' }, 'Sort by Oldest'),
                 React.createElement('option', { value: 'name-asc' }, 'Sort by Name (A-Z)'),
@@ -171,18 +169,18 @@ export default function EvidenceLocker() {
         React.createElement(Modal, { isOpen: isModalOpen, onClose: () => setIsModalOpen(false) },
             React.createElement('form', { onSubmit: handleSubmit, className: 'space-y-4' },
                 React.createElement('h2', { className: 'text-xl font-semibold' }, 'Add New Evidence'),
-                !geminiApiKey && React.createElement('div', {className: 'p-3 text-xs bg-warning-primary/10 text-warning-primary rounded-md border border-warning-primary/20'}, 'Warning: No API key found. AI entity extraction will be disabled.'),
+                !isAiAvailable && React.createElement('div', {className: 'p-3 text-xs bg-warning-primary/10 text-warning-primary rounded-md border border-warning-primary/20'}, 'Warning: AI entity extraction is disabled. Set the API_KEY environment variable to enable it.'),
                 React.createElement('div', null,
-                    React.createElement('label', { htmlFor: 'fileNameModal', className: 'block text-sm font-medium mb-1' }, 'File Name / Identifier'),
-                    React.createElement('input', { id: 'fileNameModal', type: 'text', value: String(fileName), onChange: handleFileNameChange, className: 'form-input', placeholder: 'e.g., Medical_Report_2025-08-15.pdf', required: true })
+                    React.createElement('label', { htmlFor: 'evidence-filename', className: 'block text-sm font-medium mb-1' } as any, 'File Name / Identifier'),
+                    React.createElement('input', { id: 'evidence-filename', name: 'fileName', type: 'text', value: fileName, onChange: handleFileNameChange, className: 'form-input', placeholder: 'e.g., Medical_Report_2025-08-15.pdf', required: true } as any)
                 ),
                 React.createElement('div', null,
-                    React.createElement('label', { htmlFor: 'descriptionModal', className: 'block text-sm font-medium mb-1' }, 'Description'),
-                    React.createElement('textarea', { id: 'descriptionModal', value: description, onChange: handleDescriptionChange, className: 'form-textarea', rows: 4, placeholder: 'Briefly describe what this evidence proves. Be detailed to help the AI extract entities.', required: true })
+                    React.createElement('label', { htmlFor: 'evidence-description', className: 'block text-sm font-medium mb-1' } as any, 'Description'),
+                    React.createElement('textarea', { id: 'evidence-description', name: 'description', value: description, onChange: handleDescriptionChange, className: 'form-textarea', rows: 4, placeholder: 'Briefly describe what this evidence proves. Be detailed to help the AI extract entities.', required: true } as any)
                 ),
                 React.createElement('div', null,
-                    React.createElement('label', { htmlFor: 'tagsModal', className: 'block text-sm font-medium mb-1' }, 'Tags (Optional, comma-separated)'),
-                    React.createElement('input', { id: 'tagsModal', type: 'text', value: tags, onChange: handleTagsChange, className: 'form-input', placeholder: 'e.g., DVO, Medical, School' })
+                    React.createElement('label', { htmlFor: 'evidence-tags', className: 'block text-sm font-medium mb-1' } as any, 'Tags (Optional, comma-separated)'),
+                    React.createElement('input', { id: 'evidence-tags', name: 'tags', type: 'text', value: tags, onChange: handleTagsChange, className: 'form-input', placeholder: 'e.g., DVO, Medical, School' } as any)
                 ),
                 React.createElement('div', {className: 'flex justify-end gap-2 pt-4'},
                     React.createElement('button', { type: 'button', onClick: () => setIsModalOpen(false), className: 'btn btn-secondary' }, 'Cancel'),

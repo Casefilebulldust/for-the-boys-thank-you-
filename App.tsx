@@ -8,7 +8,7 @@ import Spinner from './components/Spinner.tsx';
 import SpudBudCompanion from './components/SpudBudCompanion.tsx';
 import WarRoom from './features/WarRoom.tsx';
 import LiveOps from './features/LiveOps.tsx';
-import StrategicAnalysis from './features/StrategicAnalysis.tsx';
+import StrategicAnalysis from './features/CommandCenter.tsx';
 import Missions from './features/Missions.tsx';
 import IntakeHub from './features/IntakeHub.tsx';
 import EvidenceLocker from './features/EvidenceLocker.tsx';

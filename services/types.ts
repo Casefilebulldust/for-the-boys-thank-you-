@@ -238,6 +238,17 @@ export interface PersonalVaultEntry {
     title: string;
 }
 
+// === Burn Book ===
+export interface BurnBookEntry {
+    id: number;
+    date: string; // ISO String
+    target: string;
+    incident: string;
+    rant: string; // Markdown
+    isPromoted: boolean;
+}
+
+
 // === Master Timeline ===
 export interface TimelineEvent {
     id: string; // e.g., 'evidence-123'
@@ -252,7 +263,6 @@ export interface TimelineEvent {
 
 
 export interface SpudHubData {
-    geminiApiKey: string;
     promptSettings: PromptSettings;
     caseData: CaseData;
     ndisData: NdisData;
@@ -266,6 +276,7 @@ export interface SpudHubData {
     campaigns: Campaign[];
     activeTheme: Theme;
     personalVaultData: PersonalVaultEntry[];
+    burnBookData: BurnBookEntry[];
     showCommandDeck: boolean;
     revealShown: boolean;
 }

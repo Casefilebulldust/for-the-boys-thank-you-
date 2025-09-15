@@ -1,5 +1,6 @@
 
 
+
 import React, { useState } from 'react';
 import QRCode from 'qrcode';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
@@ -31,16 +32,16 @@ export default function DossierGenerator() {
             addToast("Please enter a topic for the custom dossier.", "error");
             return;
         }
-        if (!spudHubData.geminiApiKey) {
-            addToast("Please add your Gemini API key in System Settings.", "error");
+        if (!spudHubData.isAiAvailable) {
+            addToast("AI features require an API key to be set.", "error");
             return;
         }
         setIsLoading(true);
         setDossier('');
         try {
-            const { promptSettings, geminiApiKey, ...caseData } = spudHubData;
+            const { promptSettings, isAiAvailable, ...caseData } = spudHubData;
             const finalTopic = template === 'Custom' ? topic : template;
-            const result = await generateDossier(geminiApiKey, finalTopic, template, caseData, promptSettings.generateDossier);
+            const result = await generateDossier(finalTopic, template, caseData, promptSettings.generateDossier);
             setDossier(result);
         } catch (e) {
             const error = e instanceof Error ? e : new Error(String(e));
@@ -65,14 +66,14 @@ export default function DossierGenerator() {
                 React.createElement('h2', { className: 'text-lg font-semibold' }, 'Generate Evidence Pack'),
                 React.createElement('p', { className: 'text-sm text-gray-400' }, "Generate a comprehensive, formatted dossier on a topic. SpudBud will search all case data to compile a detailed 'evidence pack' for formal use."),
                 React.createElement('div', null,
-                    React.createElement('label', { htmlFor: 'template', className: 'block text-sm font-medium mb-1' }, 'Dossier Template'),
-                    React.createElement('select', { id: 'template', value: template, onChange: e => setTemplate(e.target.value), className: 'form-select' },
+                    React.createElement('label', { htmlFor: 'dossier-template', className: 'block text-sm font-medium mb-1' } as any, 'Dossier Template'),
+                    React.createElement('select', { id: 'dossier-template', value: template, onChange: e => setTemplate(e.target.value), className: 'form-select' } as any,
                         dossierTemplates.map(t => React.createElement('option', { key: t.id, value: t.id }, t.name))
                     )
                 ),
                 template === 'Custom' && React.createElement('div', { className: 'animate-fade-in' },
-                    React.createElement('label', { htmlFor: 'topic', className: 'block text-sm font-medium mb-1' }, 'Custom Topic'),
-                    React.createElement('input', { id: 'topic', type: 'text', value: String(topic), onChange: e => setTopic(e.target.value), className: 'form-input', placeholder: "e.g., Timeline of DVO breaches", required: true })
+                    React.createElement('label', { htmlFor: 'dossier-topic', className: 'block text-sm font-medium mb-1' } as any, 'Custom Topic'),
+                    React.createElement('input', { id: 'dossier-topic', name: 'topic', type: 'text', value: topic, onChange: e => setTopic(e.target.value), className: 'form-input', placeholder: "e.g., Timeline of DVO breaches", required: true } as any)
                 ),
                 React.createElement('button', {
                     onClick: handleGenerate,

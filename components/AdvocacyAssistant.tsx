@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
 import { useToast } from '../contexts/ToastContext.tsx';
@@ -10,7 +11,7 @@ import MarkdownRenderer from './MarkdownRenderer.tsx';
 import EmptyState from './EmptyState.tsx';
 
 export default function AdvocacyAssistant() {
-    const { geminiApiKey, caseData, evidenceData, promptSettings, actionToExecute, clearAction } = useSpudHub();
+    const { isAiAvailable, caseData, evidenceData, promptSettings, actionToExecute, clearAction } = useSpudHub();
     const { addToast } = useToast();
     const { triggerPrint } = usePrint();
     const [mode, setMode] = useState('ghostwriter');
@@ -31,14 +32,14 @@ export default function AdvocacyAssistant() {
             addToast('Please describe the situation first.', 'error');
             return;
         }
-        if (!geminiApiKey) {
-            addToast('Please add your Gemini API key in System Settings.', 'error');
+        if (!isAiAvailable) {
+            addToast('AI features require an API key to be set.', 'error');
             return;
         }
         setIsLoading(true);
         setResult('');
         try {
-            const stream = await generateAdvocacyContentStream(geminiApiKey, mode, situation, caseData, evidenceData, promptSettings.generateAdvocacyContent);
+            const stream = await generateAdvocacyContentStream(mode, situation, caseData, evidenceData, promptSettings.generateAdvocacyContent);
             for await (const chunk of stream) {
                 setResult(prev => prev + chunk.text);
             }

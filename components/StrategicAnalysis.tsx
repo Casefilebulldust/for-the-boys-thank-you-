@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
 import { useToast } from '../contexts/ToastContext.tsx';
@@ -10,23 +11,23 @@ import { ThreatMatrix, InsightAction, WellnessLog } from '../services/types.ts';
 
 const HUD = () => {
     const spudHubData = useSpudHub();
-    const { geminiApiKey, promptSettings } = spudHubData;
+    const { isAiAvailable, promptSettings } = spudHubData;
     const [hud, setHud] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
 
     const fetchHUD = useCallback(async () => {
-        if (!geminiApiKey) return;
+        if (!isAiAvailable) return;
         setIsLoading(true);
         try {
             const { promptSettings, ...snapshot } = spudHubData;
-            const result = await getHUDStatus(geminiApiKey, snapshot, promptSettings.getHUDStatus);
+            const result = await getHUDStatus(snapshot, promptSettings.getHUDStatus);
             setHud(result.hud);
         } catch (e) {
             console.error("Failed to fetch HUD status:", e);
         } finally {
             setIsLoading(false);
         }
-    }, [geminiApiKey, spudHubData]);
+    }, [isAiAvailable, spudHubData]);
 
     useEffect(() => {
         fetchHUD();
@@ -34,7 +35,7 @@ const HUD = () => {
         return () => clearInterval(interval);
     }, [fetchHUD]);
 
-    if (!geminiApiKey) return null;
+    if (!isAiAvailable) return null;
     
     return React.createElement('div', { className: 'glass-card p-4 mb-6 bg-bg-tertiary border-border-secondary' },
         React.createElement('div', { className: 'flex items-center' },
@@ -134,20 +135,20 @@ const MatrixQuadrant = ({ title, icon, color, items, onAction, onMissionCreate }
 
 export default function StrategicAnalysis() {
     const spudHubData = useSpudHub();
-    const { geminiApiKey, familyData, actionItems, wellnessLogs, evidenceData, executeInsightAction, createMission } = spudHubData;
+    const { isAiAvailable, familyData, actionItems, wellnessLogs, evidenceData, executeInsightAction, createMission } = spudHubData;
     const { addToast } = useToast();
     const [matrix, setMatrix] = useState<ThreatMatrix | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchMatrix = useCallback(async () => {
-        if (!geminiApiKey) {
+        if (!isAiAvailable) {
             setIsLoading(false);
             return;
         }
         setIsLoading(true);
         try {
             const { promptSettings, ...snapshot } = spudHubData;
-            const result = await getThreatMatrix(geminiApiKey, snapshot, promptSettings.getThreatMatrix);
+            const result = await getThreatMatrix(snapshot, promptSettings.getThreatMatrix);
             setMatrix(result);
         } catch (e) {
             const error = e instanceof Error ? e : new Error(String(e));
@@ -155,7 +156,7 @@ export default function StrategicAnalysis() {
         } finally {
             setIsLoading(false);
         }
-    }, [geminiApiKey, addToast, spudHubData]);
+    }, [isAiAvailable, addToast, spudHubData]);
 
     useEffect(() => {
         fetchMatrix();
@@ -184,10 +185,10 @@ export default function StrategicAnalysis() {
             React.createElement('div', { className: 'xl:col-span-2' },
                 React.createElement('div', { className: 'glass-card p-6' },
                     React.createElement('h2', { className: 'text-xl font-semibold mb-4' }, 'Threat & Opportunity Matrix'),
-                    !geminiApiKey ? 
+                    !isAiAvailable ? 
                         React.createElement('div', { className: 'text-center p-8' },
                             React.createElement('h3', { className: 'text-lg font-bold' }, 'AI Analysis Disabled'),
-                            React.createElement('p', { className: 'text-text-secondary' }, 'Add your Gemini API Key in System Settings to enable the Threat & Opportunity Matrix.')
+                            React.createElement('p', { className: 'text-text-secondary' }, 'AI features are enabled when the API_KEY is set in the environment.')
                         ) :
                     isLoading ? React.createElement(SkeletonLoader) :
                     React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-4' },

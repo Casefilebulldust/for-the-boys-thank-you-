@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
 import { useToast } from '../contexts/ToastContext.tsx';
@@ -8,6 +9,7 @@ import EmptyState from './EmptyState.tsx';
 import Modal from './Modal.tsx';
 import Spinner from './Spinner.tsx';
 import MarkdownRenderer from './MarkdownRenderer.tsx';
+import { analyzeJournalEntry } from '../services/geminiService.ts';
 
 const JournalEntryModal = ({ isOpen, onClose, addWellnessLog }) => {
     const { addToast } = useToast();
@@ -135,23 +137,23 @@ const JournalEntryModal = ({ isOpen, onClose, addWellnessLog }) => {
                 )
             ),
             React.createElement('div', null,
-                React.createElement('label', { htmlFor: 'detailedContent', className: 'block text-sm font-medium mb-1' }, 'Journal Notes'),
-                React.createElement('textarea', { id: 'detailedContent', value: detailedContent, onChange: e => setDetailedContent(e.target.value), className: 'form-textarea', rows: 5, placeholder: "How are you feeling physically and emotionally? This is a safe space for your thoughts..." })
+                React.createElement('label', { htmlFor: 'journal-notes', className: 'block text-sm font-medium mb-1' } as any, 'Journal Notes'),
+                React.createElement('textarea', { id: 'journal-notes', name: 'detailedContent', value: detailedContent, onChange: e => setDetailedContent(e.target.value), className: 'form-textarea', rows: 5, placeholder: "How are you feeling physically and emotionally? This is a safe space for your thoughts..." } as any)
             ),
             React.createElement('div', { className: 'grid grid-cols-2 gap-4' },
                  React.createElement('div', null,
-                    React.createElement('label', { htmlFor: 'stress_modal', className: 'block text-sm font-medium mb-1 flex justify-between' },
+                    React.createElement('label', { htmlFor: 'stress-level', className: 'block text-sm font-medium mb-1 flex justify-between' } as any,
                         React.createElement('span', null, 'Stress Level'),
                         React.createElement('span', { className: `font-bold ${getLevelColor(stress)}` }, stress)
                     ),
-                    React.createElement('input', { id: 'stress_modal', type: 'range', min: '0', max: '10', value: String(stress), onChange: e => setStress(Number(e.target.value)), className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' })
+                    React.createElement('input', { id: 'stress-level', name: 'stress', type: 'range', min: '0', max: '10', value: stress, onChange: e => setStress(Number(e.target.value)), className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' } as any)
                 ),
                 React.createElement('div', null,
-                    React.createElement('label', { htmlFor: 'pain_modal', className: 'block text-sm font-medium mb-1 flex justify-between' },
+                    React.createElement('label', { htmlFor: 'pain-level', className: 'block text-sm font-medium mb-1 flex justify-between' } as any,
                         React.createElement('span', null, 'Pain Level'),
                         React.createElement('span', { className: `font-bold ${getLevelColor(pain)}` }, pain)
                     ),
-                    React.createElement('input', { id: 'pain_modal', type: 'range', min: '0', max: '10', value: String(pain), onChange: e => setPain(Number(e.target.value)), className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' })
+                    React.createElement('input', { id: 'pain-level', name: 'pain', type: 'range', min: '0', max: '10', value: pain, onChange: e => setPain(Number(e.target.value)), className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' } as any)
                 ),
             ),
             React.createElement('div', { className: 'flex justify-end gap-2 pt-2' },
@@ -163,12 +165,30 @@ const JournalEntryModal = ({ isOpen, onClose, addWellnessLog }) => {
 };
 
 const WellnessLogCard = ({ log }) => {
+    const { promptSettings, isAiAvailable } = useSpudHub();
+    const { addToast } = useToast();
     const [isExpanded, setIsExpanded] = useState(false);
+    const [analysis, setAnalysis] = useState(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     const getLevelColor = (level) => {
         if (level >= 8) return 'text-level-high';
         if (level >= 5) return 'text-level-medium';
         return 'text-level-low';
+    };
+
+    const handleAnalyze = async () => {
+        if (!isAiAvailable) return addToast("AI features require an API Key.", "error");
+        setIsAnalyzing(true);
+        try {
+            const result = await analyzeJournalEntry(log.detailedContent, promptSettings.analyzeJournalEntry);
+            setAnalysis(result);
+        } catch (e) {
+            const error = e instanceof Error ? e : new Error(String(e));
+            addToast(`Analysis error: ${error.message}`, "error");
+        } finally {
+            setIsAnalyzing(false);
+        }
     };
 
     return React.createElement('div', { className: 'glass-card p-4 animate-fade-in' },
@@ -186,78 +206,56 @@ const WellnessLogCard = ({ log }) => {
         log.detailedContent && React.createElement('div', { className: 'mt-3 pt-3 border-t border-border-primary' },
             isExpanded ? React.createElement(MarkdownRenderer, { markdownText: log.detailedContent }) : React.createElement('p', {className: 'text-sm text-text-secondary'}, `${log.detailedContent.substring(0, 100)}...`),
             React.createElement('button', { onClick: () => setIsExpanded(!isExpanded), className: 'text-accent-primary text-sm font-semibold mt-2' }, isExpanded ? 'Show Less' : 'Show More')
+        ),
+        log.detailedContent && isExpanded && isAiAvailable && React.createElement('div', { className: 'mt-3 pt-3 border-t border-border-primary' },
+            analysis ? 
+                React.createElement('div', {className: 'p-3 bg-bg-secondary rounded-lg'}, React.createElement(MarkdownRenderer, { markdownText: `**SpudBud's Reflection:**\n\n${analysis}` })) :
+                React.createElement('button', { onClick: handleAnalyze, disabled: isAnalyzing, className: 'btn btn-secondary btn-sm' }, 
+                    isAnalyzing ? React.createElement(Spinner, {size: 'fa-sm'}) : React.createElement(React.Fragment, null, React.createElement('i', {className: 'fa-solid fa-brain mr-2'}), 'Get AI Reflection')
+                )
         )
     );
 };
 
 export default function WellnessTracker() {
     const { wellnessLogs, addWellnessLog } = useSpudHub();
-    const [stress, setStress] = useState(5);
-    const [pain, setPain] = useState(5);
-    const [notes, setNotes] = useState('');
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        addWellnessLog({ stress: stress, pain: pain, notes });
-        setStress(5);
-        setPain(5);
-        setNotes('');
+    const handleQuickLog = (stress, pain) => {
+        addWellnessLog({ stress, pain, notes: `Quick log: Stress ${stress}, Pain ${pain}.` });
     };
-
-    const getLevelColor = (level) => {
-        if (level >= 8) return 'text-level-high';
-        if (level >= 5) return 'text-level-medium';
-        return 'text-level-low';
-    };
-
-    const handleStressChange = (e) => setStress(Number(e.target.value));
-    const handlePainChange = (e) => setPain(Number(e.target.value));
-    const handleNotesChange = (e) => setNotes(e.target.value);
 
     return React.createElement('div', { className: 'animate-fade-in' },
-        React.createElement(PageTitle, { title: 'Wellness Tracker', icon: 'fa-heart-pulse', children: null }),
-        React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-3 gap-6' },
-            React.createElement('div', { className: 'lg:col-span-1' },
-                React.createElement('form', { onSubmit: handleSubmit, className: 'glass-card p-6 space-y-4' },
-                    React.createElement('h2', { className: 'text-lg font-semibold' }, 'Daily Check-in'),
-                    React.createElement('div', null,
-                        React.createElement('label', { htmlFor: 'stress', className: 'block text-sm font-medium mb-1 flex justify-between' },
-                            React.createElement('span', null, 'Stress Level'),
-                            React.createElement('span', { className: `font-bold ${getLevelColor(stress)}` }, stress)
-                        ),
-                        React.createElement('input', { id: 'stress', name: 'stress', type: 'range', min: '0', max: '10', value: String(stress), onChange: handleStressChange, className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' })
-                    ),
-                    React.createElement('div', null,
-                        React.createElement('label', { htmlFor: 'pain', className: 'block text-sm font-medium mb-1 flex justify-between' },
-                            React.createElement('span', null, 'Pain Level'),
-                            React.createElement('span', { className: `font-bold ${getLevelColor(pain)}` }, pain)
-                        ),
-                        React.createElement('input', { id: 'pain', name: 'pain', type: 'range', min: '0', max: '10', value: String(pain), onChange: handlePainChange, className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' })
-                    ),
-                    React.createElement('div', null,
-                        React.createElement('label', { htmlFor: 'notes', className: 'block text-sm font-medium mb-1' }, 'Notes (Optional)'),
-                        React.createElement('textarea', { id: 'notes', name: 'notes', value: notes, onChange: handleNotesChange, className: 'form-textarea', rows: 3, placeholder: 'Any specific thoughts or feelings?' })
-                    ),
-                    React.createElement('button', { type: 'submit', className: 'btn btn-primary w-full' }, 'Log Check-in'),
-                    React.createElement('div', { className: 'border-t border-border-primary my-4' }),
-                    React.createElement('button', { type: 'button', onClick: () => setIsModalOpen(true), className: 'btn btn-secondary w-full' }, 
-                         React.createElement('i', { className: 'fa-solid fa-book-medical mr-2'}),
-                        'Create Journal Entry'
-                    )
+        React.createElement(PageTitle, { title: 'Wellness Tracker', icon: 'fa-heart-pulse' },
+            React.createElement('button', { onClick: () => setIsJournalModalOpen(true), className: 'btn btn-primary' }, 
+                React.createElement('i', { className: 'fa-solid fa-book-medical mr-2'}),
+                'New Journal Entry'
+            )
+        ),
+        React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-6' },
+            React.createElement('div', { className: 'md:col-span-2' },
+                 React.createElement('div', { className: 'space-y-4' },
+                    wellnessLogs.length > 0 ? wellnessLogs.map(log => 
+                        React.createElement(WellnessLogCard, { key: log.id, log: log })
+                    ) : React.createElement('div', {className: 'glass-card'}, React.createElement(EmptyState, { icon: 'fa-heart-circle-xmark', title: 'No Wellness Logs', message: 'Use the controls to add a quick log or create a detailed journal entry.'}))
                 )
             ),
-            React.createElement('div', { className: 'lg:col-span-2' },
-                React.createElement('div', null,
-                    React.createElement('h2', { className: 'text-lg font-semibold mb-4' }, 'Recent Logs'),
-                     wellnessLogs.length > 0 ? (
-                        React.createElement('div', { className: 'space-y-4' }, wellnessLogs.slice(0, 10).map(log =>
-                           React.createElement(WellnessLogCard, { key: log.id, log: log })
-                        ))
-                    ) : React.createElement('div', { className: 'glass-card p-4' }, React.createElement(EmptyState, { icon: 'fa-list-check', title: 'No Logs Yet', message: 'Use the form to add your first daily wellness check-in.', children: null }))
+            React.createElement('div', { className: 'space-y-4' },
+                React.createElement('div', { className: 'glass-card p-6' },
+                    React.createElement('h2', { className: 'text-lg font-semibold mb-3' }, 'Quick Log'),
+                    React.createElement('p', { className: 'text-sm text-text-secondary mb-4' }, 'How are you feeling right now?'),
+                    React.createElement('div', { className: 'flex justify-around' },
+                        React.createElement('button', { onClick: () => handleQuickLog(3, 3), className: 'btn btn-secondary flex-col h-20 w-20' }, React.createElement('i', {className: 'fa-solid fa-face-smile text-2xl mb-1 text-success-primary'}), React.createElement('span', {className: 'text-xs'}, 'Okay')),
+                        React.createElement('button', { onClick: () => handleQuickLog(6, 6), className: 'btn btn-secondary flex-col h-20 w-20' }, React.createElement('i', {className: 'fa-solid fa-face-meh text-2xl mb-1 text-warning-primary'}), React.createElement('span', {className: 'text-xs'}, 'Struggling')),
+                        React.createElement('button', { onClick: () => handleQuickLog(9, 9), className: 'btn btn-secondary flex-col h-20 w-20' }, React.createElement('i', {className: 'fa-solid fa-face-dizzy text-2xl mb-1 text-danger-primary'}), React.createElement('span', {className: 'text-xs'}, 'Overwhelmed'))
+                    )
                 )
             )
         ),
-        React.createElement(JournalEntryModal, { isOpen: isModalOpen, onClose: () => setIsModalOpen(false), addWellnessLog: addWellnessLog })
+        React.createElement(JournalEntryModal, { 
+            isOpen: isJournalModalOpen, 
+            onClose: () => setIsJournalModalOpen(false),
+            addWellnessLog: addWellnessLog
+        })
     );
 }

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
 import { useToast } from '../contexts/ToastContext.tsx';
-import { generateAccountabilitySummary } from '../services/geminiService.ts';
+import { generateAccountabilitySummary, suggestImpactScore } from '../services/geminiService.ts';
 import PageTitle from './PageTitle.tsx';
 import Spinner from './Spinner.tsx';
 import Modal from './Modal.tsx';
@@ -30,13 +30,13 @@ const ImpactMeter = ({ score }: { score: number }) => {
     );
 };
 
-const ChargeCard = ({ entry, onStatusChange, onAnalyzeImpact, geminiApiKey }) => {
+const ChargeCard = ({ entry, onStatusChange, onAnalyzeImpact, isAiAvailable, onEdit, onDelete }) => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const { addToast } = useToast();
 
     const handleAnalyze = async () => {
-        if (!geminiApiKey) {
-            addToast("Add your Gemini API key to analyze impact.", "error");
+        if (!isAiAvailable) {
+            addToast("AI features require an API key to be set in the environment.", "error");
             return;
         }
         setIsAnalyzing(true);
@@ -50,7 +50,7 @@ const ChargeCard = ({ entry, onStatusChange, onAnalyzeImpact, geminiApiKey }) =>
     };
 
     const handleStatusChange = (e) => {
-        onStatusChange(entry.id, e.target.value as AccountabilityEntry['status']);
+        onStatusChange(entry.id, { status: e.target.value as AccountabilityEntry['status'] });
     };
     
     return React.createElement('li', { className: 'p-4' },
@@ -62,47 +62,110 @@ const ChargeCard = ({ entry, onStatusChange, onAnalyzeImpact, geminiApiKey }) =>
                 React.createElement('p', { className: 'text-sm text-text-secondary' }, React.createElement('strong', null, 'Required Action: '), entry.expectedAction)
             ),
             React.createElement('div', { className: 'flex-shrink-0 w-full sm:w-48' },
-                React.createElement('label', {htmlFor: `status-${entry.id}`, className: 'text-xs font-semibold text-text-secondary'}, 'Status'),
+                React.createElement('label', { htmlFor: `status-${entry.id}`, className: 'text-xs font-semibold text-text-secondary' } as any, 'Status'),
                 React.createElement('select', { 
                     id: `status-${entry.id}`,
                     value: entry.status, 
                     onChange: handleStatusChange, 
                     className: `form-select text-xs p-1 mt-1 border`,
                     style: statusStyles[entry.status]
-                }, statusOptions.map(opt => React.createElement('option', {key: opt, value: opt}, opt))),
+                } as any, statusOptions.map(opt => React.createElement('option', {key: opt, value: opt}, opt))),
                 React.createElement('div', { className: 'mt-2' },
-                    React.createElement('label', {className: 'text-xs font-semibold text-text-secondary'}, `Impact Score: ${entry.impactScore}/10`),
+                    React.createElement('label', {htmlFor: `impact-${entry.id}`, className: 'text-xs font-semibold text-text-secondary'} as any, `Impact Score: ${entry.impactScore}/10`),
                     React.createElement(ImpactMeter, {score: entry.impactScore})
                 )
             )
         ),
-        React.createElement('div', { className: 'mt-3 pt-3 border-t border-border-primary' },
+        React.createElement('div', { className: 'mt-3 pt-3 border-t border-border-primary flex items-center justify-between' },
             entry.impactAnalysis ? 
-            React.createElement('div', { className: 'text-xs p-2 bg-bg-secondary rounded' },
+            React.createElement('div', { className: 'text-xs p-2 bg-bg-secondary rounded flex-1' },
                  React.createElement('strong', { className: 'text-accent-primary' }, 'AI Impact Analysis: '),
                  React.createElement('span', { className: 'text-text-secondary' }, entry.impactAnalysis)
             ) :
             React.createElement('button', {
                 onClick: handleAnalyze,
-                disabled: isAnalyzing,
-                className: 'btn btn-secondary btn-sm w-full text-xs'
-            }, isAnalyzing ? React.createElement(Spinner, {size: 'fa-sm'}) : React.createElement(React.Fragment, null, React.createElement('i', {className: 'fa-solid fa-brain mr-2'}), 'Analyze Impact'))
+                disabled: isAnalyzing || !isAiAvailable,
+                className: 'btn btn-secondary btn-sm text-xs flex-1'
+            }, isAnalyzing ? React.createElement(Spinner, {size: 'fa-sm'}) : React.createElement(React.Fragment, null, React.createElement('i', {className: 'fa-solid fa-brain mr-2'}), 'Analyze Impact')),
+            React.createElement('div', { className: 'flex gap-2 ml-2' },
+                React.createElement('button', { onClick: () => onEdit(entry), className: 'btn btn-secondary btn-sm p-2 w-8 h-8' }, React.createElement('i', { className: 'fa-solid fa-pencil' })),
+                React.createElement('button', { onClick: () => onDelete(entry.id), className: 'btn btn-secondary btn-sm p-2 w-8 h-8 text-danger-primary' }, React.createElement('i', { className: 'fa-solid fa-trash' }))
+            )
+        )
+    );
+};
+
+const EditChargeModal = ({ isOpen, onClose, entry, onSave }) => {
+    const [formData, setFormData] = useState(entry);
+
+    React.useEffect(() => {
+        setFormData(entry);
+    }, [entry]);
+
+    if (!isOpen || !formData) return null;
+    
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: name === 'impactScore' ? Number(value) : value }));
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onSave(formData);
+        onClose();
+    };
+
+    return React.createElement(Modal, { isOpen, onClose },
+        React.createElement('form', { onSubmit: handleSubmit, className: 'space-y-4' },
+            React.createElement('h2', { className: 'text-lg font-semibold' }, 'Edit Charge'),
+            React.createElement('input', { type: 'date', name: 'date', value: formData.date.slice(0,10), onChange: handleChange, className: 'form-input' }),
+            React.createElement('input', { type: 'text', name: 'agency', value: formData.agency || '', onChange: handleChange, className: 'form-input', placeholder: 'Agency' }),
+            React.createElement('textarea', { name: 'failure', value: formData.failure || '', onChange: handleChange, className: 'form-textarea', rows: 3, placeholder: 'Failure' }),
+            React.createElement('textarea', { name: 'expectedAction', value: formData.expectedAction || '', onChange: handleChange, className: 'form-textarea', rows: 2, placeholder: 'Required Action' }),
+            React.createElement('input', { type: 'range', name: 'impactScore', min: 1, max: 10, value: formData.impactScore, onChange: handleChange, className: 'w-full' }),
+            React.createElement('div', { className: 'flex justify-end gap-2 pt-2' },
+                React.createElement('button', { type: 'button', onClick: onClose, className: 'btn btn-secondary' }, 'Cancel'),
+                React.createElement('button', { type: 'submit', className: 'btn btn-primary' }, 'Save Changes')
+            )
         )
     );
 };
 
 export default function AccountabilityCitadel() {
-    const { geminiApiKey, accountabilityEntries, addAccountabilityEntry, updateAccountabilityEntryStatus, analyzeImpactForCharge, evidenceData, promptSettings } = useSpudHub();
+    const { accountabilityEntries, addAccountabilityEntry, updateById, deleteById, evidenceData, promptSettings, analyzeImpactForCharge, isAiAvailable } = useSpudHub();
     const { addToast } = useToast();
     const [date, setDate] = useState(new Date().toISOString().slice(0,10));
     const [agency, setAgency] = useState('');
     const [failure, setFailure] = useState('');
     const [expectedAction, setExpectedAction] = useState('');
     const [impactScore, setImpactScore] = useState(5);
+    const [impactJustification, setImpactJustification] = useState('');
+    const [isSuggestingImpact, setIsSuggestingImpact] = useState(false);
     const [evidenceId, setEvidenceId] = useState('');
     const [summary, setSummary] = useState('');
     const [isLoadingSummary, setIsLoadingSummary] = useState(false);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingEntry, setEditingEntry] = useState(null);
+
+    const handleSuggestImpact = async () => {
+        if (!isAiAvailable) return addToast("AI features require an API Key.", "error");
+        if (!failure || !expectedAction) return addToast("Please provide Failure and Required Action details first.", "error");
+        
+        setIsSuggestingImpact(true);
+        setImpactJustification('');
+        try {
+            const result = await suggestImpactScore({ failure, expectedAction }, promptSettings.suggestImpactScore);
+            setImpactScore(result.score);
+            setImpactJustification(result.justification);
+            addToast("AI has suggested an impact score.", "success");
+        } catch (e) {
+            const error = e instanceof Error ? e : new Error(String(e));
+            addToast(`Suggestion Error: ${error.message}`, 'error');
+        } finally {
+            setIsSuggestingImpact(false);
+        }
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -119,24 +182,42 @@ export default function AccountabilityCitadel() {
         setExpectedAction('');
         setEvidenceId('');
         setImpactScore(5);
+        setImpactJustification('');
     };
 
     const handleGenerateSummary = async () => {
-        if (!geminiApiKey) {
-            addToast("Add your Gemini API key in System Settings to use this feature.", "error");
+        if (!isAiAvailable) {
+            addToast("AI features require an API Key.", "error");
             return;
         }
         setIsLoadingSummary(true);
         setSummary('');
         try {
-            const result = await generateAccountabilitySummary(geminiApiKey, accountabilityEntries, promptSettings.generateAccountabilitySummary);
+            const result = await generateAccountabilitySummary(accountabilityEntries, promptSettings.generateAccountabilitySummary);
             setSummary(result);
-            setIsModalOpen(true);
+            setIsSummaryModalOpen(true);
         } catch (e) {
             const error = e instanceof Error ? e : new Error(String(e));
             addToast(`Summary Error: ${error.message}`, 'error');
         } finally {
             setIsLoadingSummary(false);
+        }
+    };
+
+    const handleEdit = (entry) => {
+        setEditingEntry(entry);
+        setIsEditModalOpen(true);
+    };
+
+    const handleSaveEdit = (updatedEntry) => {
+        updateById('accountabilityEntries', updatedEntry.id, updatedEntry);
+        addToast("Charge updated.", "success");
+    };
+
+    const handleDelete = (id) => {
+        if (window.confirm("Are you sure you want to delete this charge? This cannot be undone.")) {
+            deleteById('accountabilityEntries', id);
+            addToast("Charge deleted.", "success");
         }
     };
 
@@ -157,42 +238,48 @@ export default function AccountabilityCitadel() {
                             React.createElement(ChargeCard, { 
                                 key: entry.id, 
                                 entry,
-                                geminiApiKey,
-                                onStatusChange: updateAccountabilityEntryStatus,
-                                onAnalyzeImpact: analyzeImpactForCharge,
+                                isAiAvailable,
+                                onStatusChange: (id, payload) => updateById('accountabilityEntries', id, payload),
+                                onAnalyzeImpact: (id) => analyzeImpactForCharge(id),
+                                onEdit: handleEdit,
+                                onDelete: handleDelete
                             })
                         ))
-                    ) : React.createElement(EmptyState, { icon: 'fa-landmark', title: 'No Charges Logged', message: 'Use the form to add a new charge to the Accountability Citadel.', children: null })
+                    ) : React.createElement(EmptyState, { icon: 'fa-landmark', title: 'No Charges Logged', message: 'Use the form to add a new charge to the Accountability Citadel.' })
                 )
             ),
             React.createElement('form', { onSubmit: handleSubmit, className: 'glass-card p-6 space-y-4' },
                 React.createElement('h2', { className: 'text-lg font-semibold' }, 'Log New Charge'),
                 React.createElement('div', null,
-                    React.createElement('label', { htmlFor: 'date', className: 'block text-sm font-medium mb-1' }, 'Date'),
-                    React.createElement('input', { type: 'date', id: 'date', value: String(date), onChange: (e) => setDate(e.target.value), className: 'form-input', required: true })
+                    React.createElement('label', { htmlFor: 'charge-date', className: 'block text-sm font-medium mb-1' } as any, 'Date'),
+                    React.createElement('input', { id: 'charge-date', type: 'date', name: 'date', value: date, onChange: (e) => setDate(e.target.value), className: 'form-input', required: true } as any)
                 ),
                 React.createElement('div', null,
-                    React.createElement('label', { htmlFor: 'agency', className: 'block text-sm font-medium mb-1' }, 'Agency'),
-                    React.createElement('input', { type: 'text', id: 'agency', value: String(agency), onChange: (e) => setAgency(e.target.value), className: 'form-input', placeholder: 'e.g., QPS (Hendra)', required: true })
+                    React.createElement('label', { htmlFor: 'charge-agency', className: 'block text-sm font-medium mb-1' } as any, 'Agency'),
+                    React.createElement('input', { id: 'charge-agency', type: 'text', name: 'agency', value: agency, onChange: (e) => setAgency(e.target.value), className: 'form-input', placeholder: 'e.g., QPS (Hendra)', required: true } as any)
                 ),
                 React.createElement('div', null,
-                    React.createElement('label', { htmlFor: 'failure', className: 'block text-sm font-medium mb-1' }, 'Failure / Dereliction of Duty'),
-                    React.createElement('textarea', { id: 'failure', value: failure, onChange: (e) => setFailure(e.target.value), className: 'form-textarea', rows: 3, required: true })
+                    React.createElement('label', { htmlFor: 'charge-failure', className: 'block text-sm font-medium mb-1' } as any, 'Failure / Dereliction of Duty'),
+                    React.createElement('textarea', { id: 'charge-failure', name: 'failure', value: failure, onChange: (e) => setFailure(e.target.value), className: 'form-textarea', rows: 3, required: true } as any)
                 ),
                 React.createElement('div', null,
-                    React.createElement('label', { htmlFor: 'expected', className: 'block text-sm font-medium mb-1' }, 'Required Action Not Taken'),
-                    React.createElement('textarea', { id: 'expected', value: expectedAction, onChange: (e) => setExpectedAction(e.target.value), className: 'form-textarea', rows: 2, required: true })
+                    React.createElement('label', { htmlFor: 'charge-expected-action', className: 'block text-sm font-medium mb-1' } as any, 'Required Action Not Taken'),
+                    React.createElement('textarea', { id: 'charge-expected-action', name: 'expectedAction', value: expectedAction, onChange: (e) => setExpectedAction(e.target.value), className: 'form-textarea', rows: 2, required: true } as any)
                 ),
                  React.createElement('div', null,
-                    React.createElement('label', { htmlFor: 'impactScore', className: 'block text-sm font-medium mb-1 flex justify-between' }, 
+                    React.createElement('label', { htmlFor: 'charge-impact-score', className: 'block text-sm font-medium mb-1 flex justify-between items-center' } as any, 
                         React.createElement('span', null, 'Impact Score'),
-                        React.createElement('span', { className: 'font-bold' }, impactScore)
+                        React.createElement('div', {className: 'flex items-center gap-2'},
+                            React.createElement('button', {type: 'button', onClick: handleSuggestImpact, disabled: isSuggestingImpact || !isAiAvailable, className: 'btn btn-secondary btn-sm p-1 h-6 w-6 text-xs'}, isSuggestingImpact ? React.createElement(Spinner, {size: 'fa-xs'}) : React.createElement('i', {className: 'fa-solid fa-brain'})),
+                            React.createElement('span', { className: 'font-bold' }, impactScore)
+                        )
                     ),
-                    React.createElement('input', { id: 'impactScore', type: 'range', min: '1', max: '10', value: String(impactScore), onChange: (e) => setImpactScore(Number(e.target.value)), className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' })
+                    React.createElement('input', { id: 'charge-impact-score', name: 'impactScore', type: 'range', min: '1', max: '10', value: impactScore, onChange: (e) => setImpactScore(Number(e.target.value)), className: 'w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer' } as any),
+                    impactJustification && React.createElement('p', {className: 'text-xs italic text-text-secondary mt-1 animate-fade-in'}, `AI Justification: ${impactJustification}`)
                 ),
                 React.createElement('div', null,
-                    React.createElement('label', { htmlFor: 'evidence', className: 'block text-sm font-medium mb-1' }, 'Link Evidence'),
-                    React.createElement('select', { id: 'evidence', value: evidenceId, onChange: (e) => setEvidenceId(e.target.value), className: 'form-select' },
+                    React.createElement('label', { htmlFor: 'charge-evidence', className: 'block text-sm font-medium mb-1' } as any, 'Link Evidence'),
+                    React.createElement('select', { id: 'charge-evidence', name: 'evidence', value: evidenceId, onChange: (e) => setEvidenceId(e.target.value), className: 'form-select' } as any,
                         React.createElement('option', { value: '' }, 'None'),
                         evidenceData.map(e => React.createElement('option', { key: e.id, value: e.id.toString() }, e.fileName))
                     )
@@ -200,9 +287,15 @@ export default function AccountabilityCitadel() {
                 React.createElement('button', { type: 'submit', className: 'btn btn-primary w-full' }, 'Add Charge')
             )
         ),
-        React.createElement(Modal, { isOpen: isModalOpen, onClose: () => setIsModalOpen(false) },
+        React.createElement(Modal, { isOpen: isSummaryModalOpen, onClose: () => setIsSummaryModalOpen(false) },
             React.createElement('h2', { id: 'modal-title', className: 'text-xl font-bold mb-4' }, 'Generated Complaint Summary'),
             React.createElement(MarkdownRenderer, { markdownText: summary })
-        )
+        ),
+        React.createElement(EditChargeModal, { 
+            isOpen: isEditModalOpen, 
+            onClose: () => setIsEditModalOpen(false), 
+            entry: editingEntry, 
+            onSave: handleSaveEdit 
+        })
     );
 }

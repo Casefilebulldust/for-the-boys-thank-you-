@@ -1,13 +1,22 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+
+
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
+import { useToast } from '../contexts/ToastContext.tsx';
 import PageTitle from './PageTitle.tsx';
 import StatCard from './StatCard.tsx';
 import Spinner from './Spinner.tsx';
-import { getStrategicAdvice } from '../services/geminiService.ts';
+import { getStrategicAdvice, generateTimelineEventSummary } from '../services/geminiService.ts';
 import { TimelineEvent } from '../services/types.ts';
+import MarkdownRenderer from './MarkdownRenderer.tsx';
 
 const MasterTimeline = () => {
-    const { evidenceData, wellnessLogs, accountabilityEntries, actionItems, setActiveTab } = useSpudHub();
+    const { evidenceData, wellnessLogs, accountabilityEntries, actionItems, setActiveTab, isAiAvailable, promptSettings } = useSpudHub();
+    const { addToast } = useToast();
+    const [summaries, setSummaries] = useState({});
+    const [activeTooltipId, setActiveTooltipId] = useState(null);
+    const tooltipTriggerRefs = useRef({});
 
     const timelineEvents: TimelineEvent[] = useMemo(() => {
         const events = [
@@ -35,6 +44,32 @@ const MasterTimeline = () => {
         return events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [evidenceData, accountabilityEntries, wellnessLogs, actionItems]);
 
+    const handleSummaryHover = useCallback(async (event) => {
+        if (!isAiAvailable) return;
+        
+        setActiveTooltipId(event.id);
+
+        if (summaries[event.id]) return;
+
+        setSummaries(prev => ({ ...prev, [event.id]: { summary: null, isLoading: true } }));
+        try {
+            const summaryText = await generateTimelineEventSummary(event, promptSettings.generateTimelineEventSummary);
+            setSummaries(prev => ({ ...prev, [event.id]: { summary: summaryText, isLoading: false } }));
+        } catch (e) {
+            const error = e instanceof Error ? e : new Error(String(e));
+            addToast(`Summary Error: ${error.message}`, 'error');
+            setSummaries(prev => {
+                const newSummaries = { ...prev };
+                delete newSummaries[event.id];
+                return newSummaries;
+            });
+        }
+    }, [isAiAvailable, summaries, promptSettings, addToast]);
+
+    const handleMouseLeave = () => {
+        setActiveTooltipId(null);
+    };
+
     if (timelineEvents.length === 0) {
         return React.createElement('div', { className: 'text-center p-8' },
             React.createElement('h3', { className: 'font-semibold' }, 'Timeline is Empty'),
@@ -42,41 +77,87 @@ const MasterTimeline = () => {
         );
     }
     
-    return React.createElement('div', { className: 'relative pl-8' },
-        timelineEvents.map((event, index) => 
-            React.createElement('div', { key: event.id, className: 'timeline-item mb-8' },
-                React.createElement('div', { className: `timeline-icon ${event.colorClass}` },
-                    React.createElement('i', { className: `fa-solid ${event.icon} text-xs text-white` })
-                ),
-                React.createElement('div', { className: 'pl-4' },
-                    React.createElement('p', { className: 'text-xs text-text-secondary' }, new Date(event.date).toLocaleString()),
-                    React.createElement('h4', { className: 'font-semibold' }, event.title),
-                    React.createElement('p', { className: 'text-sm text-text-secondary mt-1' }, event.description)
+    const activeTooltipData = activeTooltipId ? {
+        id: activeTooltipId,
+        ref: tooltipTriggerRefs.current[activeTooltipId]
+    } : null;
+
+    const TooltipContent = () => {
+        if (!activeTooltipData) return null;
+        const summaryData = summaries[activeTooltipData.id];
+        if (summaryData?.isLoading || !summaryData) {
+            return React.createElement(Spinner, { size: 'fa-sm' });
+        }
+        if (summaryData.summary) {
+            return React.createElement(MarkdownRenderer, { markdownText: summaryData.summary });
+        }
+        return null;
+    }
+
+    return React.createElement(React.Fragment, null,
+        React.createElement('div', { className: 'relative pl-8' },
+            timelineEvents.map((event) => 
+                React.createElement('div', { key: event.id, className: 'timeline-item mb-8' },
+                    React.createElement('div', { className: `timeline-icon ${event.colorClass}` },
+                        React.createElement('i', { className: `fa-solid ${event.icon} text-xs text-white` })
+                    ),
+                    React.createElement('div', { className: 'pl-4' },
+                        React.createElement('div', { className: 'flex items-center gap-2' },
+                            React.createElement('p', { className: 'text-xs text-text-secondary' }, new Date(event.date).toLocaleString()),
+                            isAiAvailable && React.createElement('button', {
+                                ref: el => (tooltipTriggerRefs.current[event.id] = el),
+                                onMouseEnter: () => handleSummaryHover(event),
+                                onMouseLeave: handleMouseLeave,
+                                className: 'text-text-secondary hover:text-accent-primary transition-colors'
+                            }, React.createElement('i', { className: 'fa-solid fa-brain fa-xs' }))
+                        ),
+                        React.createElement('h4', { className: 'font-semibold' }, event.title),
+                        React.createElement('p', { className: 'text-sm text-text-secondary mt-1' }, event.description)
+                    )
                 )
             )
+        ),
+        activeTooltipData && activeTooltipData.ref && ReactDOM.createPortal(
+            React.createElement(() => {
+                const [position, setPosition] = useState({ top: -9999, left: -9999, opacity: 0 });
+                useEffect(() => {
+                    const rect = activeTooltipData.ref.getBoundingClientRect();
+                    setPosition({
+                        top: rect.top + rect.height / 2,
+                        left: rect.left + rect.width + 10,
+                        opacity: 1,
+                    });
+                }, [activeTooltipData.id]);
+
+                return React.createElement('div', {
+                    className: 'fixed z-50 glass-card p-3 max-w-xs text-sm transition-opacity duration-200',
+                    style: { ...position, transform: 'translateY(-50%)' }
+                }, React.createElement(TooltipContent, null));
+            }, { key: activeTooltipData.id }),
+            document.body
         )
     );
 };
 
 const StrategicThreatAssessment = () => {
     const spudHubData = useSpudHub();
-    const { geminiApiKey, promptSettings } = spudHubData;
+    const { isAiAvailable, promptSettings } = spudHubData;
     const [assessment, setAssessment] = useState({ threats: [], opportunities: [] });
     const [isLoading, setIsLoading] = useState(false);
 
     const fetchAssessment = useCallback(async () => {
-        if (!geminiApiKey) return;
+        if (!isAiAvailable) return;
         setIsLoading(true);
         try {
             const { promptSettings, ...snapshot } = spudHubData;
-            const result = await getStrategicAdvice(geminiApiKey, snapshot, promptSettings.getStrategicAdvice);
+            const result = await getStrategicAdvice(snapshot, promptSettings.getStrategicAdvice);
             setAssessment(result);
         } catch (e) {
             console.error("Failed to fetch strategic assessment:", e);
         } finally {
             setIsLoading(false);
         }
-    }, [geminiApiKey, spudHubData]);
+    }, [isAiAvailable, spudHubData]);
     
     useEffect(() => {
         fetchAssessment();
@@ -102,7 +183,7 @@ const StrategicThreatAssessment = () => {
             )
         ),
         isLoading && assessment.threats.length === 0 ? React.createElement(Spinner, {}) :
-        !geminiApiKey ? React.createElement('p', {className: 'text-sm text-center text-text-secondary'}, 'Add API Key in Settings to enable AI assessment.') :
+        !isAiAvailable ? React.createElement('p', {className: 'text-sm text-center text-text-secondary'}, 'Add API Key in Settings to enable AI assessment.') :
         React.createElement('div', { className: 'space-y-4' },
             React.createElement(AssessmentList, { title: 'Threats', items: assessment.threats, icon: 'fa-triangle-exclamation', color: 'text-danger-primary' }),
             React.createElement(AssessmentList, { title: 'Opportunities', items: assessment.opportunities, icon: 'fa-lightbulb', color: 'text-success-primary' })

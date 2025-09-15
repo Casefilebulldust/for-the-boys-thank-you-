@@ -1,27 +1,26 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
 import { getProactiveInsight } from '../services/geminiService.ts';
 
 export default function HeadsUpDisplay() {
     const spudHubData = useSpudHub();
-    const { geminiApiKey, executeInsightAction } = spudHubData;
+    const { executeInsightAction, isAiAvailable } = spudHubData;
     const [insight, setInsight] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
 
     const fetchInsight = useCallback(async () => {
-        if (!geminiApiKey) return;
+        if (!isAiAvailable) return;
         setIsLoading(true);
         try {
             const { promptSettings, ...snapshot } = spudHubData;
-            const result = await getProactiveInsight(geminiApiKey, snapshot, promptSettings.getProactiveInsight);
+            const result = await getProactiveInsight(snapshot, promptSettings.getProactiveInsight);
             setInsight(result);
         } catch (e) {
             console.error(`Insight Error: ${e.message}`);
         } finally {
             setIsLoading(false);
         }
-    }, [geminiApiKey, spudHubData]);
+    }, [isAiAvailable, spudHubData]);
 
     useEffect(() => { 
         const timer = setTimeout(fetchInsight, 2000); 

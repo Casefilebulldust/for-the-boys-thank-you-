@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
 import { useToast } from '../contexts/ToastContext.tsx';
@@ -17,17 +18,17 @@ const SpudLogoIcon = () => React.createElement('svg', {
 
 export default function SpudBudCompanion() {
     const spudHub = useSpudHub();
-    const { activeTab, geminiApiKey, executeInsightAction } = spudHub;
+    const { activeTab, isAiAvailable, executeInsightAction } = spudHub;
     const { addToast } = useToast();
     const [suggestion, setSuggestion] = useState<ContextualSuggestion | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
 
     const fetchSuggestion = useCallback(async () => {
-        if (!geminiApiKey) return;
+        if (!isAiAvailable) return;
         setIsLoading(true);
         try {
-            const { promptSettings, geminiApiKey, activeTheme, ...fullData } = spudHub;
+            const { promptSettings, isAiAvailable, activeTheme, ...fullData } = spudHub;
             let contextData = {};
             // Tailor the data snapshot to the active tab for relevance and efficiency
             switch (activeTab) {
@@ -37,7 +38,7 @@ export default function SpudBudCompanion() {
                 case 'Wellness Tracker': contextData = { latestLog: fullData.wellnessLogs[0] }; break;
                 default: contextData = { openMissions: fullData.missions.filter(m => m.status === 'active').length }; break;
             }
-            const result = await getContextualSuggestion(geminiApiKey, { activeTab, data: contextData }, promptSettings.getContextualSuggestion);
+            const result = await getContextualSuggestion({ activeTab, data: contextData }, promptSettings.getContextualSuggestion);
             setSuggestion(result);
             setIsOpen(true);
         } catch (e) {
@@ -46,7 +47,7 @@ export default function SpudBudCompanion() {
         } finally {
             setIsLoading(false);
         }
-    }, [geminiApiKey, activeTab, spudHub]);
+    }, [isAiAvailable, activeTab, spudHub]);
 
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -68,7 +69,7 @@ export default function SpudBudCompanion() {
         setIsOpen(false);
     }
 
-    if (!geminiApiKey) return null;
+    if (!isAiAvailable) return null;
 
     const showCompanion = isOpen && (suggestion || isLoading);
 

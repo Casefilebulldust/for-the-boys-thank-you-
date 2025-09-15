@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
 import PageTitle from '../components/PageTitle.tsx';
@@ -45,7 +43,7 @@ const MissionCard = ({ mission, onToggleStep, onExecuteAction }) => {
 };
 
 
-const CampaignCard = ({ campaign, missions, onStartMission, onToggleStep, onExecuteAction, onCreateMission }) => {
+const CampaignCard = ({ campaign, missions, onToggleStep, onExecuteAction, onCreateMission }) => {
     const campaignMissions = missions.filter(m => m.campaignId === campaign.id);
     const completedMissions = campaignMissions.filter(m => m.status === 'complete').length;
     const progress = campaignMissions.length > 0 ? (completedMissions / campaignMissions.length) * 100 : 0;
@@ -96,7 +94,7 @@ const NewCampaignForm = ({ onAddCampaign }) => {
 }
 
 export default function Missions() {
-    const { missions, campaigns, createMission, startMission, updateMissionStep, executeInsightAction, addCampaign, missionGenState } = useSpudHub();
+    const { missions, campaigns, createMission, updateMissionStep, executeInsightAction, addCampaign, missionGenState } = useSpudHub();
     
     if (missionGenState.isLoading) {
         return React.createElement('div', { className: 'flex flex-col items-center justify-center h-full' },
@@ -115,7 +113,6 @@ export default function Missions() {
                         key: campaign.id,
                         campaign,
                         missions,
-                        onStartMission: startMission,
                         onToggleStep: updateMissionStep,
                         onExecuteAction: executeInsightAction,
                         onCreateMission: createMission

@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
 import { useToast } from '../contexts/ToastContext.tsx';
@@ -9,23 +11,23 @@ import StrategicAdvisor from './StrategicAdvisor.tsx';
 
 const AIFocus = () => {
     const spudHubData = useSpudHub();
-    const { geminiApiKey, promptSettings } = spudHubData;
+    const { isAiAvailable, promptSettings } = spudHubData;
     const [hud, setHud] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
 
     const fetchHUD = useCallback(async () => {
-        if (!geminiApiKey) return;
+        if (!isAiAvailable) return;
         setIsLoading(true);
         try {
             const { promptSettings, ...snapshot } = spudHubData;
-            const result = await getHUDStatus(geminiApiKey, snapshot, promptSettings.getHUDStatus);
+            const result = await getHUDStatus(snapshot, promptSettings.getHUDStatus);
             setHud(result.hud);
         } catch (e) {
             console.error("Failed to fetch HUD status:", e);
         } finally {
             setIsLoading(false);
         }
-    }, [geminiApiKey, spudHubData]);
+    }, [isAiAvailable, spudHubData]);
 
     useEffect(() => {
         const timer = setTimeout(fetchHUD, 500); // Initial fetch
@@ -85,9 +87,9 @@ const CommunicationsHub = () => {
             ) : React.createElement('p', { className: 'text-sm text-text-secondary text-center p-4' }, 'Inbox clear. No replies pending.')
         ),
         activeTab === 'phone' && React.createElement('form', { onSubmit: handleLogCall, className: 'space-y-2 animate-fade-in' },
-            React.createElement('input', { type: 'text', value: phoneTo, onChange: handlePhoneToChange, className: 'form-input text-sm', placeholder: 'To:', required: true }),
-            React.createElement('input', { type: 'text', value: phoneSubject, onChange: handlePhoneSubjectChange, className: 'form-input text-sm', placeholder: 'Subject:', required: true }),
-            React.createElement('textarea', { value: phoneNotes, onChange: handlePhoneNotesChange, className: 'form-textarea text-sm', placeholder: 'Notes...', rows: 3 }),
+            React.createElement('input', { type: 'text', name: 'phoneTo', value: phoneTo, onChange: handlePhoneToChange, className: 'form-input text-sm', placeholder: 'To:', required: true } as any),
+            React.createElement('input', { type: 'text', name: 'phoneSubject', value: phoneSubject, onChange: handlePhoneSubjectChange, className: 'form-input text-sm', placeholder: 'Subject:', required: true } as any),
+            React.createElement('textarea', { name: 'phoneNotes', value: phoneNotes, onChange: handlePhoneNotesChange, className: 'form-textarea text-sm', placeholder: 'Notes...', rows: 3 } as any),
             React.createElement('button', { type: 'submit', className: 'btn btn-primary w-full text-sm' }, 'Log Call')
         )
     );

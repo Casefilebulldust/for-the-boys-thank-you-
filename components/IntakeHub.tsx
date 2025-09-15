@@ -5,14 +5,69 @@ import { analyzeDocument, analyzeEmail, analyzeQuickNote } from '../services/gem
 import PageTitle from './PageTitle.tsx';
 import Spinner from './Spinner.tsx';
 import EmptyState from './EmptyState.tsx';
+import Modal from './Modal.tsx';
+
+const IntakeReviewModal = ({ isOpen, onClose, suggestedActions, onConfirm }) => {
+    const [actions, setActions] = useState(suggestedActions);
+
+    React.useEffect(() => {
+        setActions(suggestedActions);
+    }, [suggestedActions]);
+
+    const handleActionChange = (index, field, value) => {
+        const newActions = [...actions];
+        newActions[index][field] = value;
+        setActions(newActions);
+    };
+    
+    const handleConfirm = () => {
+        onConfirm(actions);
+        onClose();
+    };
+
+    if (!isOpen) return null;
+
+    return React.createElement(Modal, { isOpen, onClose },
+        React.createElement('h2', { className: 'text-xl font-bold mb-4' }, 'Review Suggested Actions'),
+        React.createElement('p', { className: 'text-sm text-text-secondary mb-4' }, 'SpudBud has generated the following actions. Review and edit them before adding them to the system.'),
+        React.createElement('div', { className: 'space-y-4 max-h-96 overflow-y-auto p-1' },
+            actions.map((action, index) =>
+                React.createElement('div', { key: index, className: 'p-4 bg-bg-secondary rounded-lg space-y-2' },
+                    React.createElement('div', { className: 'flex items-center gap-2' },
+                        React.createElement('i', { className: `fa-solid ${action.type === 'create_evidence' ? 'fa-plus' : 'fa-paper-plane'} text-accent-primary` }),
+                        React.createElement('strong', { className: 'text-text-primary' }, action.type === 'create_evidence' ? 'Create Evidence' : 'Create Action Item')
+                    ),
+                    action.type === 'create_evidence' ?
+                        React.createElement('textarea', {
+                            name: 'details',
+                            value: action.details || '',
+                            onChange: e => handleActionChange(index, 'details', e.target.value),
+                            className: 'form-textarea text-sm',
+                            rows: 2
+                        } as any) :
+                        React.createElement('div', { className: 'space-y-2' },
+                             React.createElement('input', { name: 'to', type: 'text', value: action.to || '', onChange: e => handleActionChange(index, 'to', e.target.value), className: 'form-input text-sm', placeholder: 'To:' } as any),
+                             React.createElement('input', { name: 'subject', type: 'text', value: action.subject || '', onChange: e => handleActionChange(index, 'subject', e.target.value), className: 'form-input text-sm', placeholder: 'Subject:' } as any),
+                             React.createElement('textarea', { name: 'body', value: action.body || '', onChange: e => handleActionChange(index, 'body', e.target.value), className: 'form-textarea text-sm', rows: 3, placeholder: 'Body:' } as any)
+                        )
+                )
+            )
+        ),
+        React.createElement('div', { className: 'flex justify-end gap-2 mt-6' },
+            React.createElement('button', { type: 'button', onClick: onClose, className: 'btn btn-secondary' }, 'Cancel'),
+            React.createElement('button', { onClick: handleConfirm, className: 'btn btn-primary' }, 'Confirm and Add')
+        )
+    );
+};
+
 
 // A new sub-component to display analysis results cleanly
-const AnalysisResults = ({ analysis, file, onActionClick }) => {
+const AnalysisResults = ({ analysis }) => {
     if (!analysis) {
         return React.createElement(EmptyState, { icon: 'fa-file-circle-question', title: 'Awaiting Analysis', message: 'Upload a document, paste an email, or write a note, then click "Analyze" to see the results here.' });
     }
 
-    const { summary, documentType, suggestedActions } = analysis;
+    const { summary, documentType } = analysis;
 
     return React.createElement('div', { className: 'space-y-4 text-sm animate-fade-in' },
         React.createElement('div', null,
@@ -22,27 +77,12 @@ const AnalysisResults = ({ analysis, file, onActionClick }) => {
         documentType && React.createElement('div', null,
             React.createElement('strong', { className: 'text-accent-primary' }, 'Document Type: '),
             React.createElement('span', { className: 'tag' }, documentType)
-        ),
-        suggestedActions && suggestedActions.length > 0 && React.createElement('div', null,
-            React.createElement('strong', { className: 'text-accent-primary' }, 'Suggested Actions:'),
-            React.createElement('div', { className: 'space-y-2 mt-2' },
-                suggestedActions.map((action, index) =>
-                    React.createElement('button', { key: index, onClick: () => onActionClick(action, file), className: 'w-full text-left p-3 bg-bg-secondary rounded-md hover:bg-bg-tertiary transition-colors' },
-                        React.createElement('div', { className: 'flex items-center' },
-                            React.createElement('i', { className: `fa-solid ${action.type === 'create_evidence' ? 'fa-plus' : 'fa-paper-plane'} mr-3 text-accent-primary` }),
-                            React.createElement('p', { className: 'font-semibold' },
-                                action.type === 'create_evidence' ? `Create Evidence: ${action.details}` : `Draft Communication: ${action.subject}`
-                            )
-                        )
-                    )
-                )
-            )
         )
     );
 };
 
 export default function IntakeHub() {
-    const { geminiApiKey, addEvidence, addActionItem, promptSettings } = useSpudHub();
+    const { addEvidence, addActionItem, promptSettings, isAiAvailable } = useSpudHub();
     const { addToast } = useToast();
     const [activeTool, setActiveTool] = useState('document'); // 'document', 'email', 'note'
     
@@ -53,12 +93,12 @@ export default function IntakeHub() {
 
     const [isLoading, setIsLoading] = useState(false);
     const [analysis, setAnalysis] = useState(null);
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     
     const resetInputs = () => {
         setFile(null);
         setEmailData({ from: '', to: '', subject: '', body: '' });
         setNote('');
-        // Also clear the file input visually
         const fileInput = document.getElementById('file-upload-input');
         if(fileInput) (fileInput as HTMLInputElement).value = '';
     };
@@ -80,73 +120,58 @@ export default function IntakeHub() {
 
     const handleNoteChange = (e) => setNote(e.target.value);
 
-    const handleAnalyze = () => {
-        if (!geminiApiKey) return addToast('Please add your Gemini API key in System Settings.', 'error');
-        setAnalysis(null);
-
-        switch (activeTool) {
-            case 'document':
-                if (!file) return addToast('Please select a file first.', 'error');
-                handleDocumentAnalyze();
-                break;
-            case 'email':
-                if (!emailData.body) return addToast('Please paste the email body.', 'error');
-                handleEmailAnalyze();
-                break;
-            case 'note':
-                if (!note) return addToast('Please write a note first.', 'error');
-                handleNoteAnalyze();
-                break;
-            default:
-                break;
+    const processAnalysisResult = (result) => {
+        setAnalysis(result);
+        if (result.suggestedActions && result.suggestedActions.length > 0) {
+            setIsReviewModalOpen(true);
         }
+        addToast('Analysis complete.', 'success');
+    };
+
+    const handleFileAnalyze = () => {
+        return new Promise((resolve, reject) => {
+            if (!file) {
+                return reject(new Error('Please select a file first.'));
+            }
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                try {
+                    const resultAsString = event.target?.result;
+                    if (typeof resultAsString !== 'string') throw new Error("Could not read file.");
+                    const base64Data = resultAsString.split(',')[1];
+                    const result = await analyzeDocument(file.type, base64Data, promptSettings.analyzeDocument);
+                    resolve(result);
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            reader.onerror = () => reject(new Error('Could not read the file.'));
+            reader.readAsDataURL(file);
+        });
     };
     
-    const handleDocumentAnalyze = () => {
+    const handleAnalyze = async () => {
+        if (!isAiAvailable) return addToast('AI features require an API Key.', 'error');
+        
+        setAnalysis(null);
         setIsLoading(true);
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            try {
-                const resultAsString = event.target?.result;
-                if (typeof resultAsString !== 'string') throw new Error("Could not read file.");
-                const base64Data = resultAsString.split(',')[1];
-                const result = await analyzeDocument(geminiApiKey, file.type, base64Data, promptSettings.analyzeDocument);
-                setAnalysis(result);
-                addToast('Document analysis complete.', 'success');
-            } catch (e) {
-                const error = e instanceof Error ? e : new Error(String(e));
-                addToast(`Analysis failed: ${error.message}`, 'error');
-            } finally {
-                setIsLoading(false);
+
+        try {
+            let result;
+            switch (activeTool) {
+                case 'document':
+                    result = await handleFileAnalyze();
+                    break;
+                case 'email':
+                    if (!emailData.body) throw new Error('Please paste the email body.');
+                    result = await analyzeEmail({ ...emailData, date: new Date().toLocaleDateString() }, promptSettings.analyzeEmail);
+                    break;
+                case 'note':
+                    if (!note) throw new Error('Please write a note first.');
+                    result = await analyzeQuickNote(note, promptSettings.analyzeQuickNote);
+                    break;
             }
-        };
-        reader.onerror = () => {
-            setIsLoading(false);
-            addToast("Could not read the file.", 'error');
-        };
-        reader.readAsDataURL(file);
-    };
-
-    const handleEmailAnalyze = async () => {
-        setIsLoading(true);
-        try {
-            const result = await analyzeEmail(geminiApiKey, { ...emailData, date: new Date().toLocaleDateString() }, promptSettings.analyzeEmail);
-            setAnalysis(result);
-            addToast('Email analysis complete.', 'success');
-        } catch(e) {
-            const error = e instanceof Error ? e : new Error(String(e));
-            addToast(`Analysis failed: ${error.message}`, 'error');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleNoteAnalyze = async () => {
-        setIsLoading(true);
-        try {
-            const result = await analyzeQuickNote(geminiApiKey, note, promptSettings.analyzeQuickNote);
-            setAnalysis(result);
-            addToast('Note analysis complete.', 'success');
+            processAnalysisResult(result);
         } catch (e) {
             const error = e instanceof Error ? e : new Error(String(e));
             addToast(`Analysis failed: ${error.message}`, 'error');
@@ -154,14 +179,27 @@ export default function IntakeHub() {
             setIsLoading(false);
         }
     };
+    
+    const handleConfirmActions = (confirmedActions) => {
+        let evidenceCount = 0;
+        let actionItemCount = 0;
+        
+        confirmedActions.forEach(action => {
+            if (action.type === 'create_evidence') {
+                const fileName = analysis.documentType ? `${analysis.documentType.replace(/\s+/g, '_')}_${Date.now()}.txt` : `Note_${Date.now()}.txt`;
+                addEvidence(fileName, action.details, new Date().toISOString());
+                evidenceCount++;
+            } else if (action.type === 'create_action_item') {
+                addActionItem({ to: action.to, subject: action.subject, body: action.body });
+                actionItemCount++;
+            }
+        });
 
-    const handleActionClick = (action, associatedFile) => {
-        if (action.type === 'create_evidence') {
-            const fileName = associatedFile ? associatedFile.name : `Note_${action.details.substring(0,20).replace(/\s+/g, '_') || Date.now()}.txt`;
-            addEvidence(fileName, action.details, new Date().toISOString());
-        } else if (action.type === 'create_action_item') {
-            addActionItem({ to: action.to || 'Recipient', subject: action.subject || 'Subject', body: action.body || '' });
-        }
+        if (evidenceCount > 0) addToast(`${evidenceCount} evidence item(s) created.`, 'success');
+        if (actionItemCount > 0) addToast(`${actionItemCount} action item(s) created.`, 'success');
+        
+        setAnalysis(null);
+        resetInputs();
     };
 
     const renderTool = () => {
@@ -175,15 +213,15 @@ export default function IntakeHub() {
             case 'email':
                 return React.createElement('div', { className: 'animate-fade-in space-y-2' },
                      React.createElement('h2', { className: 'text-lg font-semibold' }, 'Paste & Analyze Email'),
-                     React.createElement('input', {type: 'text', name: 'from', value: emailData.from, onChange: handleEmailChange, placeholder: 'From:', className: 'form-input'}),
-                     React.createElement('input', {type: 'text', name: 'subject', value: emailData.subject, onChange: handleEmailChange, placeholder: 'Subject:', className: 'form-input'}),
-                     React.createElement('textarea', {name: 'body', value: emailData.body, onChange: handleEmailChange, placeholder: 'Paste full email body here...', rows: 8, className: 'form-textarea'})
+                     React.createElement('input', { name: 'from', type: 'text', value: emailData.from, onChange: handleEmailChange, placeholder: 'From:', className: 'form-input' } as any),
+                     React.createElement('input', { name: 'subject', type: 'text', value: emailData.subject, onChange: handleEmailChange, placeholder: 'Subject:', className: 'form-input' } as any),
+                     React.createElement('textarea', { name: 'body', value: emailData.body, onChange: handleEmailChange, placeholder: 'Paste full email body here...', rows: 8, className: 'form-textarea' } as any)
                 );
             case 'note':
                 return React.createElement('div', { className: 'animate-fade-in space-y-4' },
                     React.createElement('h2', { className: 'text-lg font-semibold' }, 'Analyze a Quick Note'),
                     React.createElement('p', { className: 'text-sm text-text-secondary' }, 'Jot down a thought, a summary of a phone call, or an observation. SpudBud will turn it into structured data.'),
-                    React.createElement('textarea', {name: 'note', value: note, onChange: handleNoteChange, placeholder: 'e.g., Spoke with Mr. Smith at school, he confirmed the incident report would be ready by Friday...', rows: 8, className: 'form-textarea'})
+                    React.createElement('textarea', { name: 'note', value: note, onChange: handleNoteChange, placeholder: 'e.g., Spoke with Mr. Smith at school, he confirmed the incident report would be ready by Friday...', rows: 8, className: 'form-textarea' } as any)
                 );
             default:
                 return null;
@@ -206,8 +244,14 @@ export default function IntakeHub() {
             ),
             React.createElement('div', { className: 'glass-card p-6' },
                 React.createElement('h2', { className: 'text-lg font-semibold mb-4' }, 'Analysis Results'),
-                isLoading ? React.createElement(Spinner, {}) : React.createElement(AnalysisResults, { analysis: analysis, file: file, onActionClick: handleActionClick })
+                isLoading ? React.createElement(Spinner, {}) : React.createElement(AnalysisResults, { analysis: analysis })
             )
-        )
+        ),
+        React.createElement(IntakeReviewModal, { 
+            isOpen: isReviewModalOpen,
+            onClose: () => setIsReviewModalOpen(false),
+            suggestedActions: analysis?.suggestedActions || [],
+            onConfirm: handleConfirmActions
+        })
     );
 }

@@ -1,16 +1,17 @@
+
+
 import React, { useState, useMemo, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { marked } from 'marked';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
 import { useToast } from '../contexts/ToastContext.tsx';
-import { suggestNextStepForChild, generateFamilyBriefing } from '../services/geminiService.ts';
+import { suggestNextStepForChild, generateFamilyBriefing, draftGratitudeMessage } from '../services/geminiService.ts';
 import PageTitle from './PageTitle.tsx';
 import Spinner from './Spinner.tsx';
 import EmptyState from './EmptyState.tsx';
 import Modal from './Modal.tsx';
 import MarkdownRenderer from './MarkdownRenderer.tsx';
-import { Child, ChildAdvocacyItem, GratitudeEntry, Supporter } from '../services/types.ts';
-import { defaultPrompts } from '../constants.ts';
+import { Child, GratitudeEntry, Supporter, AgendaItem } from '../services/types.ts';
 
 const FamilyBriefingModal = ({ isOpen, onClose, briefingText }) => {
     const [qrCodeUrl, setQrCodeUrl] = useState('');
@@ -98,8 +99,11 @@ const FamilyBriefingModal = ({ isOpen, onClose, briefingText }) => {
 };
 
 const GratitudeEntryModal = ({ isOpen, onClose, onSubmit, entry = null }) => {
+    const spudHub = useSpudHub();
+    const { addToast } = useToast();
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
+    const [isDrafting, setIsDrafting] = useState(false);
 
     useEffect(() => {
         if (entry) {
@@ -110,6 +114,25 @@ const GratitudeEntryModal = ({ isOpen, onClose, onSubmit, entry = null }) => {
             setContent('');
         }
     }, [entry, isOpen]);
+
+    const handleAiDraft = async () => {
+        if (!spudHub.isAiAvailable) return addToast("API Key needed for AI drafts.", "error");
+        setIsDrafting(true);
+        try {
+            const context = {
+                completedMissions: spudHub.missions.filter(m => m.status === 'complete').slice(0,2).map(m => m.title),
+                recentWellness: spudHub.wellnessLogs.filter(w => w.stress < 5).slice(0,1)
+            };
+            const result = await draftGratitudeMessage(JSON.stringify(context), spudHub.promptSettings.draftGratitudeMessage);
+            setTitle(result.title);
+            setContent(result.content);
+        } catch(e) {
+            const error = e instanceof Error ? e : new Error(String(e));
+            addToast(`Drafting error: ${error.message}`, "error");
+        } finally {
+            setIsDrafting(false);
+        }
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -125,6 +148,7 @@ const GratitudeEntryModal = ({ isOpen, onClose, onSubmit, entry = null }) => {
             React.createElement('input', { type: 'text', value: title, onChange: handleTitleChange, placeholder: 'Title', className: 'form-input', required: true }),
             React.createElement('textarea', { value: content, onChange: handleContentChange, placeholder: 'Your message of thanks...', rows: 8, className: 'form-textarea', required: true }),
             React.createElement('div', { className: 'flex justify-end gap-2 pt-2' },
+                React.createElement('button', { type: 'button', onClick: handleAiDraft, disabled: isDrafting, className: 'btn btn-secondary mr-auto'}, isDrafting ? React.createElement(Spinner, {size: 'fa-sm'}) : React.createElement(React.Fragment, null, React.createElement('i', {className: 'fa-solid fa-wand-magic-sparkles mr-2'}), 'AI Draft')),
                 React.createElement('button', { type: 'button', onClick: onClose, className: 'btn btn-secondary' }, 'Cancel'),
                 React.createElement('button', { type: 'submit', className: 'btn btn-primary' }, 'Save Entry')
             )
@@ -133,7 +157,8 @@ const GratitudeEntryModal = ({ isOpen, onClose, onSubmit, entry = null }) => {
 };
 
 const GratitudeJournal = ({ supporter }: { supporter: Supporter }) => {
-    const { familyData, addGratitudeEntry, updateGratitudeEntry, deleteGratitudeEntry } = useSpudHub();
+    const { familyData, setFamilyData } = useSpudHub();
+    const { addToast } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingEntry, setEditingEntry] = useState<GratitudeEntry | null>(null);
 
@@ -144,13 +169,26 @@ const GratitudeJournal = ({ supporter }: { supporter: Supporter }) => {
     );
 
     const handleSaveEntry = (data: { title: string, content: string }) => {
+        let newJournal;
         if (editingEntry) {
-            updateGratitudeEntry(editingEntry.id, data.title, data.content);
+            newJournal = familyData.gratitudeJournal.map(e => e.id === editingEntry.id ? {...e, ...data} : e);
+            addToast("Entry updated.", "success");
         } else {
-            addGratitudeEntry(supporter.id, data.title, data.content);
+            const newEntry = { id: Date.now(), supporterId: supporter.id, date: new Date().toISOString(), ...data };
+            newJournal = [newEntry, ...familyData.gratitudeJournal];
+            addToast("Entry added.", "success");
         }
+        setFamilyData({...familyData, gratitudeJournal: newJournal});
         setIsModalOpen(false);
         setEditingEntry(null);
+    };
+
+    const handleDeleteEntry = (id) => {
+        if(window.confirm("Are you sure you want to delete this entry?")) {
+            const newJournal = familyData.gratitudeJournal.filter(e => e.id !== id);
+            setFamilyData({...familyData, gratitudeJournal: newJournal});
+            addToast("Entry deleted.", "success");
+        }
     };
 
     const handleNewEntry = () => {
@@ -179,7 +217,7 @@ const GratitudeJournal = ({ supporter }: { supporter: Supporter }) => {
                             ),
                             React.createElement('div', { className: 'flex gap-2' },
                                 React.createElement('button', { onClick: () => handleEditEntry(entry), className: 'btn btn-secondary btn-sm p-2 h-7 w-7' }, React.createElement('i', {className: 'fa-solid fa-pencil text-xs'})),
-                                React.createElement('button', { onClick: () => deleteGratitudeEntry(entry.id), className: 'btn btn-secondary btn-sm p-2 h-7 w-7 text-danger-primary' }, React.createElement('i', {className: 'fa-solid fa-trash text-xs'}))
+                                React.createElement('button', { onClick: () => handleDeleteEntry(entry.id), className: 'btn btn-secondary btn-sm p-2 h-7 w-7 text-danger-primary' }, React.createElement('i', {className: 'fa-solid fa-trash text-xs'}))
                             )
                         ),
                         React.createElement(MarkdownRenderer, { markdownText: entry.content, className: 'mt-3' })
@@ -203,13 +241,13 @@ const GratitudeJournal = ({ supporter }: { supporter: Supporter }) => {
 };
 
 const ChildProfileView = ({ child }: { child: Child }) => {
-    const { createMission, generateChildAdvocacyPlan, geminiApiKey, promptSettings } = useSpudHub();
+    const { createMission, generateChildAdvocacyPlan, isAiAvailable, promptSettings } = useSpudHub();
     const { addToast } = useToast();
     const [isLoading, setIsLoading] = useState({ plan: false, suggestion: false });
     const [suggestion, setSuggestion] = useState('');
 
     const handleGeneratePlan = async () => {
-        if (!geminiApiKey) return addToast("API Key is required to generate plans.", "error");
+        if (!isAiAvailable) return addToast("API Key is required to generate plans.", "error");
         setIsLoading(prev => ({ ...prev, plan: true }));
         try {
             await generateChildAdvocacyPlan(child.id);
@@ -219,14 +257,15 @@ const ChildProfileView = ({ child }: { child: Child }) => {
     };
     
     const handleGetSuggestion = async () => {
-        if (!geminiApiKey) return addToast("API Key is required for suggestions.", "error");
+        if (!isAiAvailable) return addToast("API Key is required for suggestions.", "error");
         setIsLoading(prev => ({ ...prev, suggestion: true }));
         setSuggestion('');
         try {
-            const result = await suggestNextStepForChild(geminiApiKey, child, promptSettings.suggestNextStepForChild);
+            const result = await suggestNextStepForChild(child, promptSettings.suggestNextStepForChild);
             setSuggestion(result);
         } catch (e) {
-            addToast(`Suggestion Error: ${e.message}`, "error");
+            const error = e instanceof Error ? e : new Error(String(e));
+            addToast(`Suggestion Error: ${error.message}`, "error");
         } finally {
             setIsLoading(prev => ({ ...prev, suggestion: false }));
         }
@@ -275,43 +314,93 @@ const ChildProfileView = ({ child }: { child: Child }) => {
     );
 };
 
+const AgendaView = () => {
+    const { familyData, setFamilyData } = useSpudHub();
+    const [newItemTitle, setNewItemTitle] = useState('');
+    const [newItemTime, setNewItemTime] = useState('');
+    const [isUrgent, setIsUrgent] = useState(false);
+
+    const handleAddItem = (e) => {
+        e.preventDefault();
+        if(!newItemTitle) return;
+        const newItem: AgendaItem = {
+            id: Date.now(),
+            title: newItemTitle,
+            time: newItemTime,
+            isUrgent: isUrgent
+        };
+        const newAgenda = [newItem, ...familyData.agenda];
+        setFamilyData({...familyData, agenda: newAgenda});
+        setNewItemTitle('');
+        setNewItemTime('');
+        setIsUrgent(false);
+    };
+    
+    const handleDeleteItem = (id) => {
+        const newAgenda = familyData.agenda.filter(item => item.id !== id);
+        setFamilyData({...familyData, agenda: newAgenda});
+    };
+
+    return React.createElement('div', {className: 'glass-card p-6'},
+        React.createElement('h2', {className: 'text-xl font-semibold mb-4'}, 'Family Agenda'),
+        React.createElement('form', {onSubmit: handleAddItem, className: 'flex gap-2 mb-4'},
+            React.createElement('input', {type: 'text', value: newItemTitle, onChange: e => setNewItemTitle(e.target.value), className: 'form-input flex-grow', placeholder: 'New agenda item...', required: true}),
+            React.createElement('input', {type: 'text', value: newItemTime, onChange: e => setNewItemTime(e.target.value), className: 'form-input w-32', placeholder: 'Time/Date'}),
+            React.createElement('label', {className: 'flex items-center gap-2 cursor-pointer text-sm p-2 rounded-md hover:bg-bg-tertiary'}, 
+                React.createElement('input', {type: 'checkbox', checked: isUrgent, onChange: e => setIsUrgent(e.target.checked), className: 'form-checkbox'}),
+                'Urgent'
+            ),
+            React.createElement('button', {type: 'submit', className: 'btn btn-primary'}, 'Add')
+        ),
+        familyData.agenda.length > 0 ? (
+            React.createElement('ul', {className: 'space-y-2'}, familyData.agenda.map(item =>
+                React.createElement('li', {key: item.id, className: `p-3 rounded-md flex justify-between items-center ${item.isUrgent ? 'bg-danger-primary/10' : 'bg-bg-secondary'}`},
+                    React.createElement('div', null, 
+                        React.createElement('p', {className: 'font-semibold'}, item.title),
+                        React.createElement('p', {className: 'text-xs text-text-secondary'}, item.time)
+                    ),
+                    React.createElement('button', {onClick: () => handleDeleteItem(item.id), className: 'btn btn-secondary btn-sm p-2 w-7 h-7 text-danger-primary'}, React.createElement('i', {className: 'fa-solid fa-trash text-xs'}))
+                )
+            ))
+        ) : React.createElement(EmptyState, {icon: 'fa-calendar-check', title: 'Agenda is Clear', message: 'Add a new item to get started.'})
+    )
+};
+
 
 export default function FamilyHub() {
     const spudHubData = useSpudHub();
-    const { familyData } = spudHubData;
+    const { familyData, isAiAvailable } = spudHubData;
     const { addToast } = useToast();
     
-    const initialProfile = familyData.children.length > 0
-        ? { type: 'child', id: familyData.children[0].id }
-        : familyData.supporters.length > 0
-            ? { type: 'supporter', id: familyData.supporters[0].id }
-            : null;
+    const initialProfile = 'agenda';
 
-    const [activeProfile, setActiveProfile] = useState(initialProfile);
+    const [activeTab, setActiveTab] = useState(initialProfile);
     const [isBriefingModalOpen, setIsBriefingModalOpen] = useState(false);
     const [briefingText, setBriefingText] = useState('');
     const [isGeneratingBriefing, setIsGeneratingBriefing] = useState(false);
 
     const profiles = useMemo(() => [
+        { type: 'agenda', id: 'agenda', name: 'Agenda' },
         ...familyData.children.map(c => ({ type: 'child', id: c.id, name: c.name })),
         ...familyData.supporters.map(s => ({ type: 'supporter', id: s.id, name: s.name }))
     ], [familyData.children, familyData.supporters]);
     
     const selectedProfileData = useMemo(() => {
-        if (!activeProfile) return null;
-        const source = activeProfile.type === 'child' ? familyData.children : familyData.supporters;
-        return source.find(p => p.id === activeProfile.id);
-    }, [activeProfile, familyData]);
+        if (!activeTab || activeTab === 'agenda') return null;
+        const [type, id] = activeTab.split('-');
+        const source = type === 'child' ? familyData.children : familyData.supporters;
+        return source.find(p => p.id === Number(id));
+    }, [activeTab, familyData]);
     
     const handleGenerateBriefing = async () => {
-        if (!spudHubData.geminiApiKey) {
-            addToast('Please add your Gemini API key in System Settings.', 'error');
+        if (!isAiAvailable) {
+            addToast('AI features require an API key to be set.', 'error');
             return;
         }
         setIsGeneratingBriefing(true);
         try {
-            const { promptSettings, geminiApiKey, ...caseData } = spudHubData;
-            const result = await generateFamilyBriefing(geminiApiKey, caseData, promptSettings.generateFamilyBriefing);
+            const { promptSettings, isAiAvailable, ...caseData } = spudHubData;
+            const result = await generateFamilyBriefing(caseData, promptSettings.generateFamilyBriefing);
             setBriefingText(result);
             setIsBriefingModalOpen(true);
         } catch (e) {
@@ -323,15 +412,19 @@ export default function FamilyHub() {
     };
 
     const renderProfileContent = () => {
+        if (activeTab === 'agenda') {
+            return React.createElement(AgendaView);
+        }
         if (!selectedProfileData) {
             return React.createElement('div', { className: 'glass-card p-6' }, 
-                React.createElement(EmptyState, { icon: 'fa-users-viewfinder', title: 'No Profiles Found', message: 'Family and supporter profiles will be shown here.' })
+                React.createElement(EmptyState, { icon: 'fa-users-viewfinder', title: 'Select a Profile', message: 'Choose a profile from the tabs above.' })
             );
         }
-        if (activeProfile.type === 'child') {
+        const [type] = activeTab.split('-');
+        if (type === 'child') {
             return React.createElement(ChildProfileView, { child: selectedProfileData });
         }
-        if (activeProfile.type === 'supporter') {
+        if (type === 'supporter') {
             return React.createElement(GratitudeJournal, { supporter: selectedProfileData });
         }
         return null;
@@ -346,9 +439,9 @@ export default function FamilyHub() {
         React.createElement('div', { className: 'mb-6 flex space-x-2 border-b-2 border-border-primary' },
             profiles.map(profile => React.createElement('button', {
                 key: `${profile.type}-${profile.id}`,
-                onClick: () => setActiveProfile({ type: profile.type, id: profile.id }),
+                onClick: () => setActiveTab(`${profile.type}-${profile.id}`),
                 className: `px-4 py-2 text-lg font-semibold transition-all duration-200 border-b-2 -mb-0.5 ${
-                    activeProfile && activeProfile.id === profile.id && activeProfile.type === profile.type
+                    activeTab === `${profile.type}-${profile.id}`
                         ? 'border-accent-primary text-accent-primary'
                         : 'border-transparent text-text-secondary hover:text-text-primary'
                 }`

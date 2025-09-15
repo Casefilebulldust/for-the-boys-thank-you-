@@ -1,5 +1,5 @@
 {
-  "name": "citadel-of-power",
+  "name": "the-citadel-13-september",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -13,7 +13,7 @@
     "react": "18.2.0",
     "marked": "13.0.2",
     "qrcode": "1.5.3",
-    "react-dom": "^19.1.1"
+    "react-dom": "18.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

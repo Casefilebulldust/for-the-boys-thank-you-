@@ -7,19 +7,19 @@ import MarkdownRenderer from './MarkdownRenderer.tsx';
 
 export default function StrategicAdvisor() {
     const spudHubData = useSpudHub();
-    const { geminiApiKey, strategyData, promptSettings } = spudHubData;
+    const { isAiAvailable, strategyData, promptSettings } = spudHubData;
     const { addToast } = useToast();
     const [advice, setAdvice] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
     const fetchAdvice = useCallback(async () => {
-        if (!geminiApiKey) {
-            setAdvice("Add your Gemini API Key in System Settings to enable the Strategic Advisor.");
+        if (!isAiAvailable) {
+            setAdvice("AI features are disabled. Set the API_KEY environment variable to enable the Strategic Advisor.");
             return;
         }
         setIsLoading(true);
         try {
-            const result = await getStrategySuggestion(geminiApiKey, strategyData, promptSettings.getStrategySuggestion);
+            const result = await getStrategySuggestion(strategyData, promptSettings.getStrategySuggestion);
             setAdvice(result);
         } catch (e) {
             const error = e instanceof Error ? e : new Error(String(e));
@@ -28,7 +28,7 @@ export default function StrategicAdvisor() {
         } finally {
             setIsLoading(false);
         }
-    }, [geminiApiKey, strategyData, promptSettings, addToast]);
+    }, [isAiAvailable, strategyData, promptSettings, addToast]);
 
     useEffect(() => {
         fetchAdvice();

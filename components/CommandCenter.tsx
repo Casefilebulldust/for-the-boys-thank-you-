@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSpudHub } from '../contexts/SpudHubContext.tsx';
 import { useToast } from '../contexts/ToastContext.tsx';
@@ -11,16 +10,17 @@ import { ThreatMatrix, InsightAction, WellnessLog } from '../services/types.ts';
 
 const HUD = () => {
     const spudHubData = useSpudHub();
-    const { geminiApiKey, promptSettings } = spudHubData;
+    const { promptSettings } = spudHubData;
     const [hud, setHud] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const geminiApiKey = process.env.API_KEY;
 
     const fetchHUD = useCallback(async () => {
         if (!geminiApiKey) return;
         setIsLoading(true);
         try {
             const { promptSettings, ...snapshot } = spudHubData;
-            const result = await getHUDStatus(geminiApiKey, snapshot, promptSettings.getHUDStatus);
+            const result = await getHUDStatus(snapshot, promptSettings.getHUDStatus);
             setHud(result.hud);
         } catch (e) {
             console.error("Failed to fetch HUD status:", e);
@@ -135,10 +135,11 @@ const MatrixQuadrant = ({ title, icon, color, items, onAction, onMissionCreate }
 
 export default function CommandCenter() {
     const spudHubData = useSpudHub();
-    const { geminiApiKey, familyData, actionItems, wellnessLogs, evidenceData, executeInsightAction, createMission } = spudHubData;
+    const { familyData, actionItems, wellnessLogs, evidenceData, executeInsightAction, createMission } = spudHubData;
     const { addToast } = useToast();
     const [matrix, setMatrix] = useState<ThreatMatrix | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const geminiApiKey = process.env.API_KEY;
 
     const fetchMatrix = useCallback(async () => {
         if (!geminiApiKey) {
@@ -148,7 +149,7 @@ export default function CommandCenter() {
         setIsLoading(true);
         try {
             const { promptSettings, ...snapshot } = spudHubData;
-            const result = await getThreatMatrix(geminiApiKey, snapshot, promptSettings.getThreatMatrix);
+            const result = await getThreatMatrix(snapshot, promptSettings.getThreatMatrix);
             setMatrix(result);
         } catch (e) {
             const error = e instanceof Error ? e : new Error(String(e));
@@ -188,7 +189,7 @@ export default function CommandCenter() {
                     !geminiApiKey ? 
                         React.createElement('div', { className: 'text-center p-8' },
                             React.createElement('h3', { className: 'text-lg font-bold' }, 'AI Analysis Disabled'),
-                            React.createElement('p', { className: 'text-text-secondary' }, 'Add your Gemini API Key in System Settings to enable the Threat & Opportunity Matrix.')
+                            React.createElement('p', { className: 'text-text-secondary' }, 'AI features are enabled when the API_KEY is set in the environment.')
                         ) :
                     isLoading ? React.createElement(SkeletonLoader) :
                     React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-4' },
